@@ -1,0 +1,73 @@
+# Plano de Implementação: Agente de IA Autônomo e Conversacional com Painel de Chat
+
+Este plano descreve o desenvolvimento de um **Agente de IA Autônomo e Conversacional** integrado ao sistema. Ele permite que o usuário interaja e dê ordens diretas via chat para a IA executar na tela, além de permitir que passos de IA dentro de automações rodem de forma autônoma e interativa, conversando com o usuário em tempo real.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Modelo de Visão (GPT-4o)**: O Agente utilizará o modelo `gpt-4o` com imagens (prints de tela) para analisar a interface física em tempo real, identificar elementos de interface e planejar e executar ações de clique, digitação e rolagem até que o objetivo seja cumprido.
+>
+> **Painel de Chat Integrado**: A janela principal do aplicativo será expandida para acomodar uma terceira coluna à direita, contendo o histórico de chat e entrada de comandos.
+>
+> **Loop de Agente Autônomo**: Quando ativado por um comando de chat ou por um passo de IA de uma automação, o agente executará em um loop contínuo (máximo de 12 iterações por tarefa). A cada iteração ele captura a tela, avalia o progresso, decide se a tarefa foi concluída, executa ações, e pode fazer perguntas para o usuário no chat e pausar até receber uma resposta.
+
+---
+
+## Proposed Changes
+
+### [Componentes de UI e Lógica do Agente](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Layout de Três Colunas na Janela Principal**:
+  - Aumentar a geometria da janela principal de `750x640` para `1100x650` para criar o layout de 3 colunas:
+    1. **Coluna 1 (Esquerda)**: Automações Salvas (Listbox e botões).
+    2. **Coluna 2 (Centro)**: Controle de Gravação, Status e Configurações Globais.
+    3. **Coluna 3 (Direita)**: Painel do Agente de IA (Histórico de chat, campo de entrada, botão Enviar, Status do Agente).
+  - Inicializar variáveis de estado para a conversa:
+    - `self.chat_history_list = []` (guarda o contexto de mensagens para enviar à API).
+    - `self.user_message_event = threading.Event()` (usado para pausar o agente e aguardar resposta do usuário).
+    - `self.last_user_message = ""` (armazena a última entrada do chat).
+
+- **Lógica do Loop do Agente Autônomo (`run_autonomous_agent`)**:
+  - Implementar o método `run_autonomous_agent(self, task_description, is_step_mode=False)` executado em uma thread separada:
+    - Inicializar uma lista de `executed_actions` para evitar loops infinitos.
+    - Loop de até 12 iterações (enquanto `self.playing` for True ou o agente estiver ativo):
+      1. Tirar print da tela física atual (com DPI-awareness ativo).
+      2. Enviar o print, o histórico do chat (`self.chat_history_list`) e a lista de ações já executadas para a API `gpt-4o`.
+      3. O prompt instrui a IA a responder em JSON estruturado contendo:
+         - `completed` (boolean): Se o objetivo principal foi atingido.
+         - `message` (string): Mensagem de feedback ou pergunta para o usuário.
+         - `waiting_for_user` (boolean): Se precisa que o usuário responda algo no chat antes do próximo passo.
+         - `actions` (array): Lista de ações a executar na iteração atual (`click`, `type`, `scroll`, `wait`).
+      4. Mostrar a mensagem da IA no painel de chat.
+      5. Se `waiting_for_user` for verdadeiro, alterar status para "Aguardando resposta..." e bloquear a thread com `self.user_message_event.wait()`. Uma vez liberado pela entrada do usuário, continuar.
+      6. Executar as ações sequencialmente com delays físicos seguros.
+      7. Se `completed` for verdadeiro, finalizar com sucesso e notificar no chat.
+
+- **Comandos Diretos no Painel de Chat**:
+  - Quando o usuário digitar uma mensagem no chat enquanto o sistema estiver inativo (sem rodar automações gravadas):
+    - Iniciar a thread do agente autônomo usando a mensagem do usuário como `task_description`.
+    - O agente executará livremente na tela inteira até atingir o objetivo ou ser cancelado.
+
+- **Atualização do Passo de IA na Automação (`playback_clicks`)**:
+  - Modificar a execução do passo `Action.TYPE_AI` para iniciar o loop autônomo com o prompt da Skill.
+  - Isso garante que qualquer automação antiga contendo passos de IA agora rode de forma 100% autônoma, visiva e interativa através do chat.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Compilar o arquivo `app.py` com `python -m py_compile app.py` para garantir integridade sintática.
+
+### Manual Verification
+1. **Verificação de Layout**:
+   - Abrir o app e certificar-se de que a janela principal possui o novo painel de chat à direita com campo de texto e entrada de mensagens.
+2. **Comando Direto via Chat**:
+   - Digitar *"Abra o Bloco de Notas (ou pesquise Google no Chrome) e escreva 'Olá Agente Autônomo'"* no chat e clicar em Enviar.
+   - Verificar se o agente começa a interagir, tirando prints, descrevendo o que está fazendo no chat e realizando cliques e digitação física na tela.
+3. **Passo de IA Interativo em Automação**:
+   - Rodar uma automação contendo um passo IA. Confirmar que ele executa em loop autônomo interagindo no painel de chat.
+4. **Interação Bidirecional (Perguntas)**:
+   - Testar um comando que exija interação (ex: *"Pergunte-me qual site abrir antes de clicar"* ou simular um cenário onde o agente pergunta algo no chat e aguarda a digitação do usuário antes de prosseguir).

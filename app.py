@@ -481,8 +481,8 @@ class DatabaseManager:
 class ClickRecorderApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Gravador de Cliques")
-        self.root.geometry("750x640")
+        self.root.title("Gravador de Cliques com Agente IA")
+        self.root.geometry("1100x660")
         self.root.resizable(True, True)
 
         self.db = DatabaseManager()
@@ -493,6 +493,12 @@ class ClickRecorderApp:
         self.current_clicks = []
         self.playing = False
         self.last_key_time = 0
+
+        # Histórico de mensagens do chat e estados do agente
+        self.chat_history_list = []
+        self.user_message_event = threading.Event()
+        self.last_user_message = ""
+        self.agent_active = False
 
         self.build_ui()
         self.load_recordings()
@@ -535,42 +541,42 @@ class ClickRecorderApp:
         self.delete_button = tk.Button(button_frame, text="Excluir automação", command=self.delete_recording, width=20)
         self.delete_button.pack(pady=5)
 
-        right_frame = tk.Frame(main_frame, padx=10, pady=10)
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        middle_frame = tk.Frame(main_frame, padx=10, pady=10)
+        middle_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        tk.Label(right_frame, text="Controle de Gravação", font=("Arial", 12, "bold")).pack(anchor=tk.W)
+        tk.Label(middle_frame, text="Controle de Gravação", font=("Arial", 12, "bold")).pack(anchor=tk.W)
 
         self.status_var = tk.StringVar(value="Pronto para iniciar uma nova gravação.")
-        self.status_label = tk.Label(right_frame, textvariable=self.status_var, font=("Arial", 11), wraplength=380, justify=tk.LEFT)
+        self.status_label = tk.Label(middle_frame, textvariable=self.status_var, font=("Arial", 11), wraplength=380, justify=tk.LEFT)
         self.status_label.pack(pady=(5, 15), anchor=tk.W)
 
-        self.start_button = tk.Button(right_frame, text="Iniciar gravação", command=self.start_recording, width=22, bg="#4caf50", fg="white", font=("Arial", 11, "bold"))
+        self.start_button = tk.Button(middle_frame, text="Iniciar gravação", command=self.start_recording, width=22, bg="#4caf50", fg="white", font=("Arial", 11, "bold"))
         self.start_button.pack(pady=(0, 10))
 
-        self.stop_button = tk.Button(right_frame, text="■ Parar gravação", command=self.stop_recording, width=22, bg="#f44336", fg="white", font=("Arial", 11, "bold"))
+        self.stop_button = tk.Button(middle_frame, text="■ Parar gravação", command=self.stop_recording, width=22, bg="#f44336", fg="white", font=("Arial", 11, "bold"))
         self.stop_button.pack(pady=(0, 20))
         self.stop_button.config(state=tk.DISABLED)
 
         self.current_count_var = tk.StringVar(value="Contador: 0 cliques registrados")
-        tk.Label(right_frame, textvariable=self.current_count_var, font=("Arial", 11)).pack(anchor=tk.W)
+        tk.Label(middle_frame, textvariable=self.current_count_var, font=("Arial", 11)).pack(anchor=tk.W)
 
-        tk.Label(right_frame, text="Dicas:", font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=(20, 5))
+        tk.Label(middle_frame, text="Dicas:", font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=(20, 5))
         tips = (
             "1. Clique em 'Iniciar gravação' para começar.\n"
             "2. Aguarde 3, 2, 1 e depois use o mouse livremente.\n"
             "3. Clique em 'Parar gravação' quando quiser finalizar.\n"
             "4. Você pode editar ou excluir registros depois."
         )
-        tk.Label(right_frame, text=tips, justify=tk.LEFT, wraplength=380, font=("Arial", 10)).pack(anchor=tk.W)
+        tk.Label(middle_frame, text=tips, justify=tk.LEFT, wraplength=380, font=("Arial", 10)).pack(anchor=tk.W)
 
         # Seção Selenium
         if SELENIUM_AVAILABLE:
-            tk.Label(right_frame, text="Automação Web (Selenium)", font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=(20, 5))
-            self.selenium_button = tk.Button(right_frame, text="Abrir Navegador Automatizado", command=self.open_selenium, width=22, bg="#9c27b0", fg="white", font=("Arial", 10, "bold"))
+            tk.Label(middle_frame, text="Automação Web (Selenium)", font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=(20, 5))
+            self.selenium_button = tk.Button(middle_frame, text="Abrir Navegador Automatizado", command=self.open_selenium, width=22, bg="#9c27b0", fg="white", font=("Arial", 10, "bold"))
             self.selenium_button.pack(pady=(0, 10))
 
         # Configurações Globais
-        config_frame = tk.LabelFrame(right_frame, text="Configurações Globais", font=("Arial", 11, "bold"), padx=10, pady=5)
+        config_frame = tk.LabelFrame(middle_frame, text="Configurações Globais", font=("Arial", 11, "bold"), padx=10, pady=5)
         config_frame.pack(fill=tk.X, pady=(15, 0), side=tk.BOTTOM)
 
         tk.Label(config_frame, text="Espera Máxima (s):", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
@@ -589,6 +595,37 @@ class ClickRecorderApp:
             messagebox.showinfo("Configurações", "Configurações globais salvas com sucesso!")
 
         tk.Button(config_frame, text="Salvar", command=save_global_configs, bg="#4caf50", fg="white", font=("Arial", 9, "bold"), width=8).grid(row=1, column=2, padx=10, pady=5)
+
+        # Painel do Agente de IA (Chat) à direita
+        chat_frame = tk.Frame(main_frame, padx=10, pady=10, bg="#f5f5f5", width=340)
+        chat_frame.pack(side=tk.RIGHT, fill=tk.BOTH)
+        chat_frame.pack_propagate(False)
+
+        tk.Label(chat_frame, text="Painel do Agente IA", font=("Arial", 12, "bold"), bg="#f5f5f5", fg="#0097A7").pack(anchor=tk.W, pady=(0, 2))
+
+        self.agent_status_var = tk.StringVar(value="Status: Inativo")
+        self.agent_status_lbl = tk.Label(chat_frame, textvariable=self.agent_status_var, font=("Arial", 9, "italic"), bg="#f5f5f5", fg="gray")
+        self.agent_status_lbl.pack(anchor=tk.W, pady=(0, 5))
+
+        chat_history_frame = tk.Frame(chat_frame)
+        chat_history_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        chat_scroll = tk.Scrollbar(chat_history_frame)
+        chat_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.chat_history = tk.Text(chat_history_frame, wrap=tk.WORD, yscrollcommand=chat_scroll.set, font=("Arial", 9), state=tk.DISABLED)
+        self.chat_history.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        chat_scroll.config(command=self.chat_history.yview)
+
+        chat_input_frame = tk.Frame(chat_frame, bg="#f5f5f5")
+        chat_input_frame.pack(fill=tk.X, pady=(5, 0))
+
+        self.chat_input = tk.Entry(chat_input_frame, font=("Arial", 10))
+        self.chat_input.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=3)
+        self.chat_input.bind("<Return>", lambda e: self.send_user_message())
+
+        chat_send_btn = tk.Button(chat_input_frame, text="Enviar", command=self.send_user_message, bg="#0097A7", fg="white", font=("Arial", 9, "bold"), width=8)
+        chat_send_btn.pack(side=tk.RIGHT, padx=(5, 0))
 
     def start_recording(self):
         if self.recording:
@@ -1738,7 +1775,14 @@ class ClickRecorderApp:
 
                 elif action.type == Action.TYPE_AI:
                     self.status_var.set(f"Reproduzindo: {idx + 1}/{len(actions)} executando IA...")
-                    self.run_ai_action(action)
+                    self.run_autonomous_agent(
+                        action.ai_task,
+                        ai_mode=action.ai_mode,
+                        file_path=action.file_path,
+                        file_path_2=action.file_path_2,
+                        file_path_3=action.file_path_3,
+                        output_path=action.output_path
+                    )
 
                 self.status_var.set(f"Reproduzindo: {idx + 1}/{len(actions)} ações...")
 
@@ -1771,334 +1815,456 @@ class ClickRecorderApp:
             lines.append(f"{idx}. {str(action)}")
         return "\n".join(lines)
 
-    def run_ai_action(self, action):
+    def append_chat_message(self, sender, text):
+        self.chat_history.config(state=tk.NORMAL)
+        self.chat_history.insert(tk.END, f"[{sender}]: {text}\n\n")
+        self.chat_history.see(tk.END)
+        self.chat_history.config(state=tk.DISABLED)
+        # Salva no histórico local da conversa
+        role = "user" if sender == "Você" else "assistant"
+        if sender != "Sistema":
+            self.chat_history_list.append({"role": role, "content": text})
+
+    def send_user_message(self):
+        msg = self.chat_input.get().strip()
+        if not msg:
+            return
+        
+        self.chat_input.delete(0, tk.END)
+        self.append_chat_message("Você", msg)
+        
+        # Se o agente de IA estiver rodando e aguardando resposta
+        if self.agent_active and not self.user_message_event.is_set():
+            self.last_user_message = msg
+            self.user_message_event.set()
+        else:
+            # Caso contrário, inicia uma nova tarefa autônoma livre
+            if not self.playing:
+                self.playing = True
+                self.execute_button.config(state=tk.DISABLED)
+                if hasattr(self, 'stop_execution_button'):
+                    self.stop_execution_button.config(state=tk.NORMAL)
+                
+                # Inicia a thread do agente autônomo
+                threading.Thread(target=self.run_autonomous_agent, args=(msg,), daemon=True).start()
+            else:
+                self.append_chat_message("Sistema", "Uma automação ou tarefa de agente já está rodando. Aguarde ou clique em Parar.")
+
+    def run_autonomous_agent(self, task_description, ai_mode="ocr", file_path="", file_path_2="", file_path_3="", output_path=""):
         api_key = self.db.get_setting("openai_api_key", "").strip()
         if not api_key:
-            raise ValueError("Chave de API da OpenAI não configurada nas Configurações Globais.")
-            
+            self.append_chat_message("Sistema", "Erro: OpenAI API Key não configurada nas Configurações Globais.")
+            self.playing = False
+            self.execute_button.config(state=tk.NORMAL)
+            if hasattr(self, 'stop_execution_button'):
+                self.stop_execution_button.config(state=tk.DISABLED)
+            return
+
+        self.agent_active = True
+        self.agent_status_var.set("Status: Pensando...")
+        self.append_chat_message("Agente", f"Iniciando tarefa [{ai_mode}]: '{task_description}'")
+
         import requests
-        
+        from PIL import ImageGrab
+        import io
+        import base64
+        from pynput.mouse import Controller as MouseController, Button as MouseButton
+        from pynput.keyboard import Controller as KeyController
+
+        mouse_ctrl = MouseController()
+        key_ctrl = KeyController()
+        executed_actions = []
+
         # Lê o conteúdo do arquivo 1 se existir
         file_content_1 = ""
-        if action.file_path and os.path.exists(action.file_path):
-            with open(action.file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        if file_path and os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 file_content_1 = f.read()
 
-        if action.ai_mode == "ocr":
-            # 1. Tirar print da tela
-            from PIL import ImageGrab
-            import io
-            import base64
-            import ctypes
-            
-            # Obtém tamanho real da tela
-            try:
-                user32 = ctypes.windll.user32
-                screen_w = user32.GetSystemMetrics(0)
-                screen_h = user32.GetSystemMetrics(1)
-            except Exception:
-                screen_w, screen_h = 1920, 1080
-            
-            # Captura a tela
-            screenshot = ImageGrab.grab()
-            img_w, img_h = screenshot.size
-            
-            # Converte para JPEG e depois para base64
-            buffer = io.BytesIO()
-            screenshot.save(buffer, format="JPEG", quality=80)
-            img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
-            # Prompt para GPT-4o
-            prompt = (
-                f"Você é um robô de RPA inteligente. O usuário quer que você execute a seguinte tarefa: '{action.ai_task}'.\n"
-                f"Temos dados de um arquivo local que podem ser relevantes:\n"
-                f"=== DADOS DO ARQUIVO ===\n{file_content_1}\n========================\n\n"
-                f"A resolução física do monitor onde a ação deve ocorrer é de {screen_w}x{screen_h} pixels.\n"
-                f"A imagem enviada é um print da tela inteira do monitor. A resolução do print é {img_w}x{img_h}.\n"
-                f"Você deve identificar quais campos na tela devem ser clicados e preenchidos para realizar a tarefa.\n"
-                f"Você deve retornar a lista exata de ações de clique e digitação de teclado a serem executadas, especificando as coordenadas de clique relativas à resolução de {screen_w}x{screen_h} (e NÃO à resolução da imagem caso sejam diferentes).\n\n"
-                f"Retorne OBRIGATORIAMENTE um objeto JSON puro contendo a lista de ações. Não use blocos de marcação adicionais de código (como ```json) ou explicações. O JSON deve seguir exatamente o seguinte formato:\n"
-                f"{{\n"
-                f"  \"actions\": [\n"
-                f"    {{\"type\": \"click\", \"x\": 150, \"y\": 300}},\n"
-                f"    {{\"type\": \"type\", \"text\": \"valor a digitar\"}},\n"
-                f"    {{\"type\": \"click\", \"x\": 250, \"y\": 300}},\n"
-                f"    {{\"type\": \"type\", \"text\": \"outro valor\"}}\n"
-                f"  ]\n"
-                f"}}"
-            )
-            
-            # Envia para API da OpenAI
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": "gpt-4o",
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{img_base64}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                "max_tokens": 1000
-            }
-            
-            res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-            res.raise_for_status()
-            
-            res_data = res.json()
-            ai_message = res_data['choices'][0]['message']['content']
-            
-            content_str = ai_message.strip()
-            if content_str.startswith("```json"):
-                content_str = content_str[7:]
-            if content_str.endswith("```"):
-                content_str = content_str[:-3]
-            content_str = content_str.strip()
-            
-            actions_json = json.loads(content_str)
-            
-            # Executa ações retornadas
-            from pynput.mouse import Controller as MouseController, Button as MouseButton
-            from pynput.keyboard import Controller as KeyController
-            
-            mouse_ctrl = MouseController()
-            key_ctrl = KeyController()
-            
-            for act in actions_json.get("actions", []):
-                if not self.playing:
-                    break
-                
-                if act["type"] == "click":
-                    mouse_ctrl.position = (act["x"], act["y"])
-                    time.sleep(0.2)
-                    mouse_ctrl.press(MouseButton.left)
-                    time.sleep(0.05)
-                    mouse_ctrl.release(MouseButton.left)
-                    time.sleep(0.5)
-                elif act["type"] == "type":
-                    key_ctrl.type(act["text"])
-                    time.sleep(0.2)
-
-        elif action.ai_mode == "selenium":
+        # Para Selenium, valida se o navegador está ativo
+        if ai_mode == "selenium":
             if not SELENIUM_AVAILABLE or not hasattr(self, 'selenium_driver') or not self.selenium_driver:
-                raise ValueError("Navegador Selenium não está ativo. Por favor, abra o navegador automatizado primeiro.")
-                
-            driver = self.selenium_driver
-            
-            # Coleta informações de inputs, buttons, selects e textareas ativos
-            elements_info = []
-            for el in driver.find_elements(By.XPATH, "//*[self::input or self::textarea or self::select or self::button]"):
-                try:
-                    if el.is_displayed() and el.is_enabled():
-                        elements_info.append({
-                            "tag": el.tag_name,
-                            "id": el.get_attribute("id") or "",
-                            "name": el.get_attribute("name") or "",
-                            "placeholder": el.get_attribute("placeholder") or "",
-                            "type": el.get_attribute("type") or "",
-                            "text": el.text or ""
-                        })
-                except Exception:
-                    pass
-            
-            # Prompt para GPT-4o-mini
-            prompt = (
-                f"Você é um assistente de automação web Selenium. O usuário quer executar a tarefa: '{action.ai_task}'.\n"
-                f"Temos dados de um arquivo local relevante:\n"
-                f"=== DADOS DO ARQUIVO ===\n{file_content_1}\n========================\n\n"
-                f"Aqui está a lista de elementos interativos encontrados na página HTML atual:\n"
-                f"{json.dumps(elements_info, indent=2)}\n\n"
-                f"Identifique quais elementos devem ser clicados e preenchidos.\n"
-                f"Retorne obrigatoriamente um objeto JSON puro. O JSON deve listar as ações informando o seletor correspondente (preferencialmente por 'id' se houver, ou 'name', ou 'placeholder'). Exemplo de formato:\n"
-                f"{{\n"
-                f"  \"actions\": [\n"
-                f"    {{\"type\": \"click\", \"by\": \"id\", \"value\": \"id_do_elemento\"}},\n"
-                f"    {{\"type\": \"type\", \"by\": \"id\", \"value\": \"id_do_elemento\", \"text\": \"valor\"}},\n"
-                f"    {{\"type\": \"click\", \"by\": \"name\", \"value\": \"nome_do_elemento\"}}\n"
-                f"  ]\n"
-                f"}}"
-            )
-            
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": "gpt-4o-mini",
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "max_tokens": 1000
-            }
-            
-            res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-            res.raise_for_status()
-            
-            res_data = res.json()
-            ai_message = res_data['choices'][0]['message']['content']
-            
-            content_str = ai_message.strip()
-            if content_str.startswith("```json"):
-                content_str = content_str[7:]
-            if content_str.endswith("```"):
-                content_str = content_str[:-3]
-            content_str = content_str.strip()
-            
-            actions_json = json.loads(content_str)
-            for act in actions_json.get("actions", []):
-                if not self.playing:
-                    break
-                
-                # Localiza elemento
-                by_type = act["by"]
-                val = act["value"]
-                
-                element = None
-                try:
-                    if by_type == "id":
-                        element = driver.find_element(By.ID, val)
-                    elif by_type == "name":
-                        element = driver.find_element(By.NAME, val)
-                    elif by_type == "placeholder":
-                        element = driver.find_element(By.XPATH, f"//input[@placeholder='{val}'] | //textarea[@placeholder='{val}']")
-                except Exception:
-                    pass
-                
-                if element:
-                    if act["type"] == "click":
-                        element.click()
-                        time.sleep(0.5)
-                    elif act["type"] == "type":
-                        element.clear()
-                        element.send_keys(act["text"])
-                        time.sleep(0.3)
+                self.append_chat_message("Sistema", "Erro: O navegador Selenium não está ativo. Por favor, abra-o primeiro.")
+                self.agent_active = False
+                self.playing = False
+                self.agent_status_var.set("Status: Inativo")
+                self.execute_button.config(state=tk.NORMAL)
+                if hasattr(self, 'stop_execution_button'):
+                    self.stop_execution_button.config(state=tk.DISABLED)
+                return
 
-        elif action.ai_mode == "excel_merge":
-            # Mescla de até 3 arquivos
-            file_content_2 = ""
-            if action.file_path_2 and os.path.exists(action.file_path_2):
-                with open(action.file_path_2, 'r', encoding='utf-8', errors='ignore') as f:
-                    file_content_2 = f.read()
-            
-            file_content_3 = ""
-            if action.file_path_3 and os.path.exists(action.file_path_3):
-                with open(action.file_path_3, 'r', encoding='utf-8', errors='ignore') as f:
-                    file_content_3 = f.read()
+        # Lógica de Mesclagem de Arquivos Excel (excel_merge)
+        if ai_mode == "excel_merge":
+            self.agent_status_var.set("Status: Mesclando arquivos...")
+            try:
+                file_content_2 = ""
+                if file_path_2 and os.path.exists(file_path_2):
+                    with open(file_path_2, 'r', encoding='utf-8', errors='ignore') as f:
+                        file_content_2 = f.read()
+                
+                file_content_3 = ""
+                if file_path_3 and os.path.exists(file_path_3):
+                    with open(file_path_3, 'r', encoding='utf-8', errors='ignore') as f:
+                        file_content_3 = f.read()
 
-            prompt = (
-                f"Você é um engenheiro de dados especialista. O usuário quer realizar a seguinte mesclagem/consolidação:\n"
-                f"'{action.ai_task}'.\n\n"
-                f"Temos os conteúdos dos seguintes arquivos de entrada:\n"
-                f"=== ARQUIVO 1 ===\n{file_content_1}\n==================\n\n"
-                f"=== ARQUIVO 2 ===\n{file_content_2}\n==================\n\n"
-                f"=== ARQUIVO 3 ===\n{file_content_3}\n==================\n\n"
-                f"Por favor, consolide e formate profissionalmente os dados desses arquivos em uma única tabela estruturada.\n"
-                f"Retorne obrigatoriamente um objeto JSON contendo uma lista de linhas sob a chave 'rows', onde cada linha é um dicionário chave-valor (cabeçalho da coluna -> valor).\n"
-                f"Exemplo:\n"
-                f"{{\n"
-                f"  \"rows\": [\n"
-                f"    {{\"Nome\": \"Willian\", \"Email\": \"willian@teste.com\", \"Telefone\": \"99999-9999\", \"Origem\": \"Arquivo 1\"}},\n"
-                f"    {{\"Nome\": \"Danilo\", \"Email\": \"danilo@teste.com\", \"Telefone\": \"88888-8888\", \"Origem\": \"Arquivo 2\"}}\n"
-                f"  ]\n"
-                f"}}"
-            )
-            
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": "gpt-4o",
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "max_tokens": 3000
-            }
-            
-            res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-            res.raise_for_status()
-            
-            res_data = res.json()
-            ai_message = res_data['choices'][0]['message']['content']
-            
-            content_str = ai_message.strip()
-            if content_str.startswith("```json"):
-                content_str = content_str[7:]
-            if content_str.endswith("```"):
-                content_str = content_str[:-3]
-            content_str = content_str.strip()
-            
-            # Gera a planilha Excel formatada profissionalmente
-            import openpyxl
-            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-            from openpyxl.utils import get_column_letter
-            
-            data_json = json.loads(content_str)
-            rows = data_json.get("rows", [])
-            
-            if not rows:
-                raise ValueError("Nenhum dado retornado pela IA para mesclagem.")
+                prompt = (
+                    f"Você é um engenheiro de dados especialista. O usuário quer realizar a seguinte mesclagem/consolidação:\n"
+                    f"'{task_description}'.\n\n"
+                    f"Temos os conteúdos dos seguintes arquivos de entrada:\n"
+                    f"=== ARQUIVO 1 ===\n{file_content_1}\n==================\n\n"
+                    f"=== ARQUIVO 2 ===\n{file_content_2}\n==================\n\n"
+                    f"=== ARQUIVO 3 ===\n{file_content_3}\n==================\n\n"
+                    f"Por favor, consolide e formate profissionalmente os dados desses arquivos em uma única tabela estruturada.\n"
+                    f"Retorne obrigatoriamente um objeto JSON contendo a lista de linhas sob a chave 'rows', onde cada linha é um dicionário chave-valor (cabeçalho da coluna -> valor).\n"
+                    f"Exemplo:\n"
+                    f"{{\n"
+                    f"  \"rows\": [\n"
+                    f"    {{\"Nome\": \"Willian\", \"Email\": \"willian@teste.com\", \"Telefone\": \"99999-9999\", \"Origem\": \"Arquivo 1\"}},\n"
+                    f"    {{\"Nome\": \"Danilo\", \"Email\": \"danilo@teste.com\", \"Telefone\": \"88888-8888\", \"Origem\": \"Arquivo 2\"}}\n"
+                    f"  ]\n"
+                    f"}}"
+                )
                 
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Consolidado"
-            
-            # Cabeçalhos
-            headers_list = list(rows[0].keys())
-            for col_idx, h_text in enumerate(headers_list, start=1):
-                cell = ws.cell(row=1, column=col_idx, value=h_text)
-                cell.font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
-                cell.fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
                 
-            # Dados
-            thin_border = Border(
-                left=Side(style='thin', color='D3D3D3'),
-                right=Side(style='thin', color='D3D3D3'),
-                top=Side(style='thin', color='D3D3D3'),
-                bottom=Side(style='thin', color='D3D3D3')
-            )
-            
-            for row_idx, r_data in enumerate(rows, start=2):
-                for col_idx, h_text in enumerate(headers_list, start=1):
-                    val = r_data.get(h_text, "")
-                    cell = ws.cell(row=row_idx, column=col_idx, value=val)
-                    cell.font = Font(name="Arial", size=10)
-                    cell.alignment = Alignment(vertical="center")
-                    cell.border = thin_border
+                payload = {
+                    "model": "gpt-4o",
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 3000
+                }
+                
+                res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+                res.raise_for_status()
+                
+                res_data = res.json()
+                ai_message = res_data['choices'][0]['message']['content'].strip()
+                
+                if ai_message.startswith("```json"):
+                    ai_message = ai_message[7:]
+                if ai_message.endswith("```"):
+                    ai_message = ai_message[:-3]
+                ai_message = ai_message.strip()
+                
+                # Gera a planilha Excel formatada profissionalmente
+                import openpyxl
+                from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+                from openpyxl.utils import get_column_letter
+                
+                data_json = json.loads(ai_message)
+                rows = data_json.get("rows", [])
+                
+                if not rows:
+                    raise ValueError("Nenhum dado retornado pela IA para mesclagem.")
                     
-                    # Estilo zebrado
-                    if row_idx % 2 == 0:
-                        cell.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-            
-            # Auto-ajuste de colunas
-            for col in ws.columns:
-                max_len = 0
-                for cell in col:
-                    if cell.value:
-                        max_len = max(max_len, len(str(cell.value)))
-                col_letter = get_column_letter(col[0].column)
-                ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = "Consolidado"
                 
-            # Salva o arquivo
-            out_path = action.output_path or "consolidado.xlsx"
-            wb.save(out_path)
+                # Cabeçalhos
+                headers_list = list(rows[0].keys())
+                for col_idx, h_text in enumerate(headers_list, start=1):
+                    cell = ws.cell(row=1, column=col_idx, value=h_text)
+                    cell.font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+                    cell.fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    
+                # Dados
+                thin_border = Border(
+                    left=Side(style='thin', color='D3D3D3'),
+                    right=Side(style='thin', color='D3D3D3'),
+                    top=Side(style='thin', color='D3D3D3'),
+                    bottom=Side(style='thin', color='D3D3D3')
+                )
+                
+                for row_idx, r_data in enumerate(rows, start=2):
+                    for col_idx, h_text in enumerate(headers_list, start=1):
+                        val = r_data.get(h_text, "")
+                        cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                        cell.font = Font(name="Arial", size=10)
+                        cell.alignment = Alignment(vertical="center")
+                        cell.border = thin_border
+                        
+                        # Estilo zebrado
+                        if row_idx % 2 == 0:
+                            cell.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+                
+                # Auto-ajuste de colunas
+                for col in ws.columns:
+                    max_len = 0
+                    for cell in col:
+                        if cell.value:
+                            max_len = max(max_len, len(str(cell.value)))
+                    col_letter = get_column_letter(col[0].column)
+                    ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+                    
+                # Salva o arquivo
+                out_p = output_path or "consolidado.xlsx"
+                wb.save(out_p)
+                self.append_chat_message("Agente", f"Consolidação concluída com sucesso em: '{out_p}'!")
+            except Exception as e:
+                self.append_chat_message("Sistema", f"Erro crítico na mesclagem Excel: {str(e)}")
+            finally:
+                self.agent_active = False
+                self.playing = False
+                self.agent_status_var.set("Status: Inativo")
+                self.execute_button.config(state=tk.NORMAL)
+                if hasattr(self, 'stop_execution_button'):
+                    self.stop_execution_button.config(state=tk.DISABLED)
+            return
+
+        # Loops de Execução Autônoma para OCR e Selenium
+        max_iterations = 12
+        iteration = 0
+        success = False
+
+        try:
+            while iteration < max_iterations and self.playing:
+                iteration += 1
+                self.agent_status_var.set(f"Status: Executando {ai_mode} ({iteration}/{max_iterations})...")
+
+                # Configura requisições para a API OpenAI
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
+
+                recent_chat = self.chat_history_list[-8:] if self.chat_history_list else []
+                chat_context_str = "\n".join([f"[{m['role']}]: {m['content']}" for m in recent_chat])
+
+                if ai_mode == "ocr":
+                    # Captura a tela física
+                    try:
+                        user32 = ctypes.windll.user32
+                        screen_w = user32.GetSystemMetrics(0)
+                        screen_h = user32.GetSystemMetrics(1)
+                    except Exception:
+                        screen_w, screen_h = 1920, 1080
+
+                    screenshot = ImageGrab.grab()
+                    img_w, img_h = screenshot.size
+
+                    buffer = io.BytesIO()
+                    screenshot.save(buffer, format="JPEG", quality=80)
+                    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+                    prompt = (
+                        f"Você é um robô de RPA inteligente executando em loop autônomo. O usuário quer que você execute a seguinte tarefa: '{task_description}'.\n"
+                        f"Temos dados de um arquivo local que podem ser relevantes:\n"
+                        f"=== DADOS DO ARQUIVO ===\n{file_content_1}\n========================\n\n"
+                        f"A resolução física do monitor atual é de {screen_w}x{screen_h} pixels.\n"
+                        f"A imagem enviada é um print da tela inteira do monitor. A resolução do print é {img_w}x{img_h}.\n"
+                        f"Aqui está o histórico recente do chat:\n"
+                        f"=== HISTÓRICO DE CHAT ===\n{chat_context_str}\n========================\n\n"
+                        f"Aqui está a lista de ações já executadas para evitar repetições:\n"
+                        f"{json.dumps(executed_actions, indent=2)}\n\n"
+                        f"Você deve identificar o estado atual da tela e o próximo passo para realizar a tarefa.\n"
+                        f"Retorne OBRIGATORIAMENTE um objeto JSON puro contendo a resposta. Não use blocos de marcação adicionais de código (como ```json) ou explicações. O JSON deve seguir exatamente o seguinte formato:\n"
+                        f"{{\n"
+                        f"  \"completed\": false, // defina como true apenas quando verificar na tela que o objetivo final da tarefa foi totalmente alcançado\n"
+                        f"  \"message\": \"Texto em português descrevendo sua análise do estado atual da tela e o que vai fazer agora, ou pergunta para o usuário\",\n"
+                        f"  \"waiting_for_user\": false, // defina como true se você precisar de alguma resposta ou ajuda do usuário no chat para prosseguir\n"
+                        f"  \"actions\": [\n"
+                        f"    // Uma ou mais ações a serem executadas sequencialmente nesta iteração. Exemplos:\n"
+                        f"    // {{\"type\": \"click\", \"x\": 150, \"y\": 300}},\n"
+                        f"    // {{\"type\": \"type\", \"text\": \"valor a digitar\"}},\n"
+                        f"    // {{\"type\": \"scroll\", \"dx\": 0, \"dy\": -100}},\n"
+                        f"    // {{\"type\": \"wait\", \"duration\": 2.0}}\n"
+                        f"  ]\n"
+                        f"}}"
+                    )
+
+                    payload = {
+                        "model": "gpt-4o",
+                        "response_format": {"type": "json_object"},
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/jpeg;base64,{img_base64}"
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        "max_tokens": 1000,
+                        "temperature": 0.2
+                    }
+
+                elif ai_mode == "selenium":
+                    driver = self.selenium_driver
+                    elements_info = []
+                    for el in driver.find_elements(By.XPATH, "//*[self::input or self::textarea or self::select or self::button]"):
+                        try:
+                            if el.is_displayed() and el.is_enabled():
+                                elements_info.append({
+                                    "tag": el.tag_name,
+                                    "id": el.get_attribute("id") or "",
+                                    "name": el.get_attribute("name") or "",
+                                    "placeholder": el.get_attribute("placeholder") or "",
+                                    "type": el.get_attribute("type") or "",
+                                    "text": el.text or ""
+                                })
+                        except Exception:
+                            pass
+
+                    prompt = (
+                        f"Você é um assistente de automação web Selenium executando em loop autônomo. O usuário quer executar a tarefa: '{task_description}'.\n"
+                        f"Temos dados de um arquivo local relevante:\n"
+                        f"=== DADOS DO ARQUIVO ===\n{file_content_1}\n========================\n\n"
+                        f"Aqui está a lista de elementos interativos encontrados na página HTML atual:\n"
+                        f"{json.dumps(elements_info, indent=2)}\n\n"
+                        f"Aqui está o histórico recente do chat:\n"
+                        f"=== HISTÓRICO DE CHAT ===\n{chat_context_str}\n========================\n\n"
+                        f"Aqui está a lista de ações já executadas para evitar repetições:\n"
+                        f"{json.dumps(executed_actions, indent=2)}\n\n"
+                        f"Retorne obrigatoriamente um objeto JSON puro. O JSON deve listar as ações informando o seletor correspondente (preferencialmente por 'id' se houver, ou 'name', ou 'placeholder'). Formato:\n"
+                        f"{{\n"
+                        f"  \"completed\": false, // defina como true quando verificar que a tarefa web foi concluída\n"
+                        f"  \"message\": \"Texto em português informando o que está fazendo ou perguntando algo ao usuário\",\n"
+                        f"  \"waiting_for_user\": false, // se precisar de resposta do usuário no chat antes do próximo passo\n"
+                        f"  \"actions\": [\n"
+                        f"    // Exemplos:\n"
+                        f"    // {{\"type\": \"click\", \"by\": \"id\", \"value\": \"id_do_elemento\"}},\n"
+                        f"    // {{\"type\": \"type\", \"by\": \"id\", \"value\": \"id_do_elemento\", \"text\": \"valor\"}},\n"
+                        f"    // {{\"type\": \"wait\", \"duration\": 1.0}}\n"
+                        f"  ]\n"
+                        f"}}"
+                    )
+
+                    payload = {
+                        "model": "gpt-4o-mini",
+                        "response_format": {"type": "json_object"},
+                        "messages": [
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 1000,
+                        "temperature": 0.2
+                    }
+
+                res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+                res.raise_for_status()
+                res_data = res.json()
+                ai_message = res_data['choices'][0]['message']['content'].strip()
+
+                if ai_message.startswith("```json"):
+                    ai_message = ai_message[7:]
+                if ai_message.endswith("```"):
+                    ai_message = ai_message[:-3]
+                ai_message = ai_message.strip()
+
+                response_json = json.loads(ai_message)
+
+                msg_text = response_json.get("message", "")
+                if msg_text:
+                    self.append_chat_message("Agente", msg_text)
+
+                if response_json.get("completed", False):
+                    success = True
+                    self.append_chat_message("Agente", "Objetivo alcançado! Tarefa concluída.")
+                    break
+
+                if response_json.get("waiting_for_user", False):
+                    self.user_message_event.clear()
+                    self.agent_status_var.set("Status: Aguardando resposta do usuário...")
+                    while self.playing and not self.user_message_event.is_set():
+                        time.sleep(0.2)
+                    
+                    if not self.playing:
+                        break
+                    continue
+
+                # Executa ações
+                actions_list = response_json.get("actions", [])
+                for act in actions_list:
+                    if not self.playing:
+                        break
+
+                    act_type = act.get("type")
+                    if ai_mode == "ocr":
+                        if act_type == "click":
+                            x, y = act.get("x"), act.get("y")
+                            mouse_ctrl.position = (x, y)
+                            time.sleep(0.2)
+                            mouse_ctrl.press(MouseButton.left)
+                            time.sleep(0.05)
+                            mouse_ctrl.release(MouseButton.left)
+                            time.sleep(0.5)
+                            executed_actions.append(f"Clique em ({x}, {y})")
+
+                        elif act_type == "type":
+                            text = act.get("text")
+                            key_ctrl.type(text)
+                            time.sleep(0.2)
+                            executed_actions.append(f"Digitação de '{text}'")
+
+                        elif act_type == "scroll":
+                            dx, dy = act.get("dx", 0), act.get("dy", 0)
+                            mouse_ctrl.scroll(dx, dy)
+                            time.sleep(0.3)
+                            executed_actions.append(f"Rolagem (dx={dx}, dy={dy})")
+
+                        elif act_type == "wait":
+                            duration = act.get("duration", 1.0)
+                            time.sleep(duration)
+                            executed_actions.append(f"Espera de {duration}s")
+                            
+                    elif ai_mode == "selenium":
+                        driver = self.selenium_driver
+                        by_type = act.get("by")
+                        val = act.get("value")
+                        element = None
+                        try:
+                            if by_type == "id":
+                                element = driver.find_element(By.ID, val)
+                            elif by_type == "name":
+                                element = driver.find_element(By.NAME, val)
+                            elif by_type == "placeholder":
+                                element = driver.find_element(By.XPATH, f"//input[@placeholder='{val}'] | //textarea[@placeholder='{val}']")
+                        except Exception:
+                            pass
+
+                        if element:
+                            if act_type == "click":
+                                element.click()
+                                time.sleep(0.5)
+                                executed_actions.append(f"Clique Selenium no elemento '{val}'")
+                            elif act_type == "type":
+                                element.clear()
+                                element.send_keys(act["text"])
+                                time.sleep(0.3)
+                                executed_actions.append(f"Digitação Selenium no elemento '{val}' de '{act['text']}'")
+                            elif act_type == "wait":
+                                duration = act.get("duration", 1.0)
+                                time.sleep(duration)
+                                executed_actions.append(f"Espera Selenium de {duration}s")
+                        else:
+                            executed_actions.append(f"Elemento '{val}' não localizado nesta iteração.")
+
+                time.sleep(1.0)
+
+            if not success and iteration >= max_iterations:
+                self.append_chat_message("Agente", "Limite máximo de iterações atingido sem confirmação de sucesso.")
+
+        except Exception as e:
+            self.append_chat_message("Sistema", f"Erro crítico na execução do agente: {str(e)}")
+            print(f"Erro no agente autônomo: {e}")
+        finally:
+            self.agent_active = False
+            self.playing = False
+            self.agent_status_var.set("Status: Inativo")
+            self.execute_button.config(state=tk.NORMAL)
+            if hasattr(self, 'stop_execution_button'):
+                self.stop_execution_button.config(state=tk.DISABLED)
 
     def open_selenium(self):
         """Abre uma janela de automação web com Selenium."""

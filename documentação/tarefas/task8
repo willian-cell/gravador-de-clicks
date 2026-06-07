@@ -1,0 +1,14 @@
+# Lista de Tarefas: Agente de IA Autônomo e Conversacional com Painel de Chat
+
+- `[x]` Ajustar o tamanho da janela principal (`1150x660`) e criar o layout de 3 colunas em `app.py`
+- `[x]` Adicionar componentes do painel de chat à direita (área de texto com scroll, campo de digitação, botão Enviar, status)
+- `[x]` Implementar métodos do chat no `ClickRecorderApp` (`append_chat_message`, `send_user_message`)
+- `[x]` Inicializar o estado do agente (`chat_history_list`, `user_message_event`, `agent_active`)
+- `[x]` Implementar o loop do agente autônomo no método `run_autonomous_agent`
+- `[x]` Enviar os prints de tela, histórico de chat e ações executadas para a API `gpt-4o` no loop do agente
+- `[x]` Tratar as ações retornadas pelo JSON do agente (`click`, `type`, `scroll`, `wait`) executando-as fisicamente com delays seguros
+- `[x]` Tratar a pausa do agente com `user_message_event` quando o JSON indicar `waiting_for_user: true`
+- `[x]` Adicionar suporte no chat para disparar o agente autônomo diretamente a partir de um comando de texto livre
+- `[x]` Integrar a execução do loop autônomo no passo `Action.TYPE_AI` do fluxo de automação (`playback_clicks`)
+- `[x]` Compilar e validar sintaxe de `app.py`
+- `[x]` Realizar testes manuais de interação, comandos diretos no chat e execução autônoma
