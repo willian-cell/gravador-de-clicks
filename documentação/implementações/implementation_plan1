@@ -1,0 +1,61 @@
+# Plano de Implementação: Automação Avançada de Cliques, Digitação e Leitura de Arquivos
+
+Adicionaremos melhorias no `ClickRecorderApp` para agrupar caracteres digitados em blocos de texto por clique, permitir a leitura dinâmica de arquivos de múltiplos formatos (TXT, JSON, CSV) para preenchimento de campos, melhorar o editor visual de ações e incluir um botão para interromper a execução automática em tempo real.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Compatibilidade de Banco de Dados**: A alteração no schema das ações (adicionando os campos `read_mode` e `file_selector` para a ação de leitura de arquivo) usará valores padrão seguros. Isso mantém total compatibilidade com as gravações existentes.
+>
+> **Comportamento do Gravador**: Durante a gravação, o teclado agrupará caracteres digitados em uma única ação `TYPE` se o tempo entre as teclas for menor que 3 segundos e nenhum clique for feito no intervalo. Se houver um clique, a digitação subsequente começará uma nova ação `TYPE`. Backspaces removerão o último caractere do bloco atual, simplificando correções.
+
+## Proposed Changes
+
+### [Click Recorder Backend & Frontend Component](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Atualização da Classe `Action`**:
+  - Adicionar atributos `read_mode` (padrão `'complete'`) e `file_selector` (padrão `''`) no construtor.
+  - Atualizar `to_dict` e `from_dict` para serializar e deserializar os novos atributos de forma retrocompatível.
+  - Melhorar `__str__` para exibir de forma intuitiva as ações do tipo `TYPE_READ_FILE` com base no modo de leitura selecionado.
+
+- **Melhoria na Captura de Teclado (`on_key_press`)**:
+  - Implementar lógica inteligente de agrupamento: se a última ação gravada for `TYPE_TYPE` e tiver sido criada há menos de 3.0 segundos, anexar o novo caractere a ela.
+  - Adicionar suporte a caracteres especiais como Espaço (`keyboard.Key.space`), Enter (`keyboard.Key.enter` como `\n`), e Backspace (`keyboard.Key.backspace` para apagar o último caractere do bloco ativo).
+
+- **Lógica de Leitura e Execução de Arquivo (`get_file_content_to_type` e `playback_clicks`)**:
+  - Criar função auxiliar `get_file_content_to_type` para ler e parsear dados de arquivos dinamicamente:
+    - **Conteúdo Completo (`complete`)**: Lê o arquivo inteiro.
+    - **Linha Específica (`line`)**: Lê uma linha específica (ex: linha 1).
+    - **Chave JSON (`json`)**: Lê um JSON e busca um campo/chave (ex: `usuario.nome`).
+    - **Coluna/Linha CSV (`csv`)**: Lê coordenadas CSV (ex: `linha,coluna`) ou busca por nome de coluna.
+  - Corrigir o cálculo de atraso em `playback_clicks` para usar a diferença de tempo relativa entre ações consecutivas em vez do início absoluto, garantindo a reprodução correta de esperas.
+  - Adicionar suporte para execução da ação `TYPE_READ_FILE` no loop de reprodução.
+
+- **Interface Gráfica**:
+  - **Botão Parar Execução**: Adicionar um botão "Parar Execução" no painel principal, habilitado apenas quando `self.playing` for `True`.
+  - **Lógica de Interrupção**: Garantir que se o usuário clicar no botão, `self.playing` seja definido como `False` e a thread de reprodução pare imediatamente.
+  - **Melhorias no Editor de Ações (`edit_actions` e `edit_action`)**:
+    - Adicionar botões para criar novas ações manualmente: `+ Clique`, `+ Digitar`, `+ Ler Arquivo` além do `+ Espera` existente.
+    - Atualizar a janela de edição de ação única (`edit_action`) para atualizar dinamicamente os campos de entrada baseados no tipo de ação selecionado através de um `fields_frame` reativo.
+    - Adicionar campos específicos para `READ_FILE` com um botão "Procurar..." (`filedialog.askopenfilename`) para facilitar a seleção de caminhos.
+
+## Verification Plan
+
+### Automated Tests
+- Não há suite de testes automatizados configurada. A validação será feita manualmente executando o app.
+
+### Manual Verification
+1. **Executar `python app.py`** e validar o design dos botões.
+2. **Gravação**:
+   - Iniciar gravação, clicar em um input, digitar "teste de digitação", apagar alguns caracteres com backspace.
+   - Parar a gravação e salvar.
+   - Verificar na lista de ações se foi gerado um único bloco "Digitar: teste de digitação" em vez de múltiplas teclas individuais.
+3. **Editor de Ações**:
+   - Abrir o editor de ações, adicionar uma nova ação de "Ler Arquivo".
+   - Escolher um arquivo `.txt` ou `.json` de teste, selecionar o modo e salvar.
+   - Validar que os campos mudam dinamicamente conforme selecionamos diferentes tipos no menu de opções.
+4. **Execução e Parada**:
+   - Iniciar a reprodução de uma gravação.
+   - Clicar em "Parar Execução" e garantir que a automação pare no mesmo instante.

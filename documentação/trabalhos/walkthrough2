@@ -1,0 +1,41 @@
+# Walkthrough: Editor Unificado e Criação de Automações do Zero
+
+Adicionamos e testamos o editor de automações de forma unificada e a capacidade de criar/excluir automações do zero. Veja abaixo um resumo completo das novas melhorias.
+
+## Recursos Implementados
+
+### 1. Editor Unificado ("Editar Automação")
+- **O que mudou**: Substituímos as duas telas separadas ("Editar gravação" e "Editar Ações") por uma única interface unificada e interativa.
+- **Funcionalidades da tela**:
+  - **Alterar o Nome**: Edite o nome da automação no topo.
+  - **Passos Interativos**: Veja e selecione cada ação registrada na lista.
+  - **Controle Total**: Com botões dedicados de edição e exclusão de passos.
+  - **Adicionar Passos**: Crie manualmente novos passos de Clique, Digitação, Espera e Leitura de Arquivo diretamente no editor.
+  - **Salvar**: O botão **Salvar Todas as Alterações** consolida as alterações de nome e de passos de uma vez no banco de dados.
+
+### 2. Criação de Automação do Zero ("Nova Automação")
+- **O que mudou**: Agora você não precisa realizar uma gravação prévia para configurar passos.
+- **Funcionalidades**:
+  - Clicando no novo botão **Nova automação** (em verde no menu lateral), o app pede um nome.
+  - O app cria um registro limpo no banco de dados e abre imediatamente o editor unificado para você preencher os passos usando os botões `+ Clique`, `+ Digitar`, `+ Espera`, `+ Ler Arquivo`.
+
+### 3. Nomenclatura Consistente ("Automação" e "Passos")
+- Toda a interface foi adaptada para usar "Automação" e "Passos" (em vez de "Gravação/Cliques"), deixando a navegação muito mais limpa e intuitiva:
+  - "Registros de Automações" -> "Automações Salvas"
+  - "Executar gravação" -> "Executar automação"
+  - "Editar gravação" -> "Editar automação"
+  - "Excluir gravação" -> "Excluir automação"
+  - "(X cliques)" -> "(X passos)"
+
+---
+
+## Como Testar as Funcionalidades
+
+### Criando e Configurando uma Automação do Zero
+1. Abra o aplicativo e clique no botão verde **Nova automação**.
+2. Digite um nome (ex: `Automação Google`) e clique em **OK**.
+3. A tela do editor abrirá vazia.
+4. Clique em **+ Clique** para adicionar um passo de clique. Dê um duplo-clique no passo para editá-lo e coloque as coordenadas do input.
+5. Clique em **+ Digitar** para adicionar um passo de texto e insira o conteúdo que deseja digitar.
+6. Clique em **Salvar Todas as Alterações**.
+7. Pronto! A nova automação estará salva na lista e pronta para execução.

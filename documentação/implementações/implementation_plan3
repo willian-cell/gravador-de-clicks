@@ -1,0 +1,40 @@
+# Plano de Implementação: Melhorias Avançadas (Edição, Gravação e Validação)
+
+Este plano implementa as principais melhorias identificadas para aumentar a robustez do Click Recorder:
+1. **Reordenação e Duplicação**: Botões para mover passos para cima/baixo e duplicá-los no editor.
+2. **Filtro de Clique de Parada**: Ignora cliques feitos dentro da janela do aplicativo para evitar poluir a automação.
+3. **Validação de Inputs**: Valida campos numéricos (coordenadas e durações) no editor para evitar erros em tempo de execução.
+
+## Proposed Changes
+
+### [Click Recorder Logic & UI](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Filtro de Cliques Internos (`on_click`)**:
+  - Na função `on_click`, verificar a posição do clique `(x, y)` em relação às coordenadas e limites atuais da janela do aplicativo (`self.root`).
+  - Se o clique ocorreu dentro da janela, ignorar a gravação.
+
+- **Validação de Entradas no Editor (`open_edit_dialog`)**:
+  - Modificar o método `save_action_changes` para validar que `x` e `y` sejam números inteiros e a `duration` seja um número decimal (float) válido antes de salvar as alterações.
+  - Exibir um alerta amigável de erro se a validação falhar.
+
+- **Reordenação e Duplicação no Editor (`edit_automation`)**:
+  - Adicionar as seguintes funções auxiliares na janela de edição:
+    - `duplicate_action()`: Duplica o passo selecionado e insere logo após, selecionando e focando na cópia.
+    - `move_up()`: Move o passo selecionado um nível para cima na lista.
+    - `move_down()`: Move o passo selecionado um nível para baixo na lista.
+  - Adicionar os novos botões ("Duplicar", "↑ Subir", "↓ Descer") na fileira de botões superiores do editor.
+
+## Verification Plan
+
+### Manual Verification
+1. **Filtro de Janela**:
+   - Iniciar gravação, clicar algumas vezes em botões do próprio app e depois na área de trabalho.
+   - Parar e validar que apenas os cliques da área de trabalho foram salvos (nenhum clique na janela do app).
+2. **Validação**:
+   - Abrir o editor, tentar digitar letras nos campos "X" ou "Duração" de um passo.
+   - Clicar em salvar e verificar se o app bloqueia com um aviso amigável.
+3. **Reordenação e Duplicação**:
+   - Selecionar um passo no editor, clicar em "Duplicar" e verificar a duplicação imediata.
+   - Selecionar um passo e clicar em "↑ Subir" ou "↓ Descer" para verificar a reordenação correta e atualização da numeração.

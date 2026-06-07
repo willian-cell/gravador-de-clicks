@@ -1,0 +1,13 @@
+# Lista de Tarefas: Persistência de Perfis (Skills) da IA e Métricas de Execução
+
+- `[x]` Atualizar o banco de dados com migração automática de colunas (`description`, `last_run_at`, `run_count`) na tabela `recordings`
+- `[x]` Criar a tabela `skills` no banco de dados e semear perfis padrões ("Disparador WhatsApp", "Mesclador de Notas Fiscais", "Preenchedor de Cadastro")
+- `[x]` Adicionar os métodos helpers de banco no `DatabaseManager` (`get_all_skills`, `add_skill`, `delete_skill`, `increment_run_count`)
+- `[x]` Atualizar os métodos de leitura de gravações (`get_all_recordings`, `get_recording`) para buscar as novas colunas
+- `[x]` Atualizar a listbox principal do aplicativo para exibir a contagem de execuções `[Executado: Xx]`
+- `[x]` Incrementar o contador de execuções ao rodar a automação (`execute_recording`) e recarregar a listbox
+- `[x]` Integrar a seleção de perfis de IA (OptionMenu) dinamicamente no editor de passos em `draw_fields()`
+- `[x]` Ajustar o tamanho/geometria dinâmica do editor para acomodar os novos campos de perfil
+- `[x]` Implementar botões para salvar e excluir perfis de IA (Skills) a partir do editor de passos
+- `[x]` Compilar e validar sintaxe de `app.py`
+- `[x]` Realizar testes manuais de migração, contagem de execução e gerenciamento de perfis de IA

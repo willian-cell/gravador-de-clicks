@@ -1,0 +1,10 @@
+# Lista de Tarefas: Automação Avançada
+
+- `[x]` Atualizar a classe `Action` em `app.py` com novos atributos `read_mode` e `file_selector`
+- `[x]` Implementar agrupamento inteligente de digitação no listener de teclado (`on_key_press`)
+- `[x]` Implementar a função `get_file_content_to_type` para ler e parsear arquivos
+- `[x]` Adicionar suporte para a ação `TYPE_READ_FILE` e corrigir o cálculo de delay em `playback_clicks`
+- `[x]` Adicionar botão "Parar Execução" e a lógica associada na UI principal
+- `[x]` Redesenhar a janela de edição de ação (`edit_action`) para atualizar dinamicamente os campos com base no tipo
+- `[x]` Adicionar novos botões no editor de ações para criar novas ações manualmente (`+ Clique`, `+ Digitar`, `+ Ler Arquivo`)
+- `[x]` Testar e validar todas as alterações manualmente

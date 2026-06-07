@@ -1,0 +1,56 @@
+# Walkthrough: Configurações Globais, Delays Ajustáveis e Automações com Inteligência Artificial
+
+Adicionamos suporte para **Configurações Globais** persistentes no banco de dados SQLite, controle inteligente de limites de velocidade de reprodução e um tipo de passo avançado **IA** (Inteligência Artificial) integrado ao fluxo da aplicação.
+
+---
+
+## Novos Recursos Implementados
+
+### 1. Painel de Configurações Globais
+* **Integração Visual**: Adicionamos um painel dedicado no canto inferior direito da janela principal (`750x640`).
+* **Parâmetros Persistidos**:
+  * **Espera Máxima (s)**: Limita o tempo padrão de reprodução lenta entre cliques. Por padrão é de **10 segundos**, mas é editável para qualquer valor.
+  * **OpenAI API Key**: Campo oculto para inserir a chave de API da OpenAI.
+* **Persistência**: Criada a tabela `settings` no banco de dados SQLite `recordings.db` que carrega e salva os valores de forma automática e persistente.
+
+### 2. Controle de Delay Inteligente
+* Ao executar uma automação, o sistema agora normaliza a velocidade de reprodução:
+  * **Limite Mínimo**: Garante um delay mínimo de **0.5 segundos** entre cliques ou digitações consecutivas (para evitar perda de foco ou erros em layouts dinâmicos).
+  * **Limite Máximo**: Limita a espera de delays longos (como os 74 segundos ocorridos na gravação) ao valor de "Espera Máxima" configurado no painel global (padrão de **10 segundos**).
+  * **Segurança**: Passos de aguardo explícitos do tipo `WAIT` não são limitados.
+
+### 3. Ações com Inteligência Artificial (Passo `IA`)
+Adicionado o botão **+ Passo IA** no editor de automação, que abre um formulário dinâmico capaz de executar três tarefas inteligentes:
+
+#### A. Visão/OCR (Desktop Geral)
+* **Como Funciona**: Tira um print da tela no exato momento da ação, converte-o para Base64 e o envia para a API do **GPT-4o** com o prompt e dados do arquivo CSV/TXT.
+* **Mapeamento de Resolução**: O robô calcula a resolução física real do seu monitor via `ctypes` e instrui a IA a converter as coordenadas da imagem para as coordenadas da sua tela. O robô clica nas coordenadas corretas e digita os valores automaticamente.
+
+#### B. Selenium Web (Navegador)
+* **Como Funciona**: Varre a página do navegador ativo procurando caixas de entrada de texto e botões interativos visíveis.
+* **Mapeamento por IA**: Envia metadados (IDs, nomes, placeholders) dos elementos para o **GPT-4o-mini** com a tarefa. A IA responde quais seletores e textos digitar, e o Selenium preenche a página web de forma limpa e rápida.
+
+#### C. Mesclar Arquivos para Excel (`excel_merge`)
+* **Como Funciona**: O formulário do editor expande-se dinamicamente (`500x620`) para permitir selecionar até **3 arquivos de entrada diferentes** (TXT, CSV) e um arquivo de saída `.xlsx`.
+* **Consolidação Inteligente**: O GPT-4o lê os conteúdos dos arquivos, processa a tarefa/filtro solicitada no campo de Skill, gera a estrutura de tabela consolidada e a grava com a biblioteca `openpyxl`.
+* **Design Profissional**: O arquivo gerado é estilizado profissionalmente com cabeçalhos azul escuro centralizados, linhas zebradas cinza e largura de colunas auto-ajustada dinamicamente com base no tamanho do maior texto de cada coluna.
+
+---
+
+## Como Utilizar e Testar os Recursos
+
+### 1. Configurar o Ambiente
+1. Insira a sua chave da OpenAI no painel **Configurações Globais** do painel principal e clique em **Salvar**.
+2. Defina o limite de **Espera Máxima** (por exemplo, `10.0` segundos).
+
+### 2. Testar o Ajuste de Delay
+1. Execute uma automação que possua grandes atrasos gravados entre os cliques.
+2. Certifique-se de que o sistema executa a automação rapidamente respeitando o limite máximo configurado no painel.
+
+### 3. Criar uma Automação com IA
+1. Abra a janela de edição de uma automação e clique em **+ Passo IA**.
+2. No menu **Modo de IA**, escolha o modo correspondente à tarefa:
+   - **Visão/OCR (Desktop)**: Indique um arquivo de dados (como seu `teste.csv`) e descreva a tarefa (ex: *"Preencha o campo de login do aplicativo com o email e clique no botão Entrar"*).
+   - **Selenium Web**: Abra a janela Selenium Web no aplicativo principal antes de iniciar. Defina a tarefa da IA no editor de passos.
+   - **Mesclar Arquivos para Excel**: Selecione os três arquivos locais de origem, defina o caminho de saída (ex: `C:/Users/willi/Documents/danilo/relatorio_final.xlsx`), e escreva a skill da IA (ex: *"Mescle o email dos clientes do Arquivo 1 com o telefone dos clientes do Arquivo 2 usando o CPF como chave comum"*).
+3. Salve o passo da IA e execute a automação normalmente.

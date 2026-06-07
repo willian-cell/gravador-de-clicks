@@ -1,0 +1,49 @@
+# Plano de Implementação: Capturar Passo no Editor
+
+Adicionaremos um botão "Capturar Passo" na tela de edição/criação de passos do editor. Quando clicado, iniciará uma contagem regressiva de 3 segundos e capturará a próxima ação (clique, rolagem ou digitação) realizada pelo usuário fora das janelas do aplicativo, preenchendo automaticamente as coordenadas, valores ou texto nos campos do diálogo.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Janelas Ignoradas**: Durante a captura temporária de cliques e rolagens, qualquer evento gerado dentro da janela principal, da janela do editor de automações ou da janela de edição de passos será ignorado para evitar registros acidentais.
+>
+> **Escopo da Captura**: A captura registrará a *primeira* ação válida que ocorrer (um clique do mouse, uma rolagem ou uma tecla pressionada) e encerrará os listeners temporários imediatamente.
+
+## Proposed Changes
+
+### [Editor Dialog Component](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Função de Verificação de Janelas**:
+  - Implementar uma função auxiliar `is_inside_window(window, x, y)` para verificar se uma coordenada está dentro de determinada janela Tkinter.
+  
+- **Função de Captura Temporária (`start_temp_capture`)**:
+  - Definir a função interna `start_temp_capture` dentro de `open_edit_dialog`.
+  - Desabilitar temporariamente o botão "Capturar Passo" e outros controles de salvamento para evitar ações concorrentes.
+  - Executar a contagem regressiva de 3 segundos em uma thread secundária para não travar a interface do usuário (Tkinter), atualizando o texto do botão (ex: "3...", "2...", "1...").
+  - Após a contagem, iniciar listeners de mouse e teclado temporários.
+  
+- **Eventos de Captura**:
+  - **Clique**: se ocorrer fora das três janelas do app, parar os listeners, atualizar `type_var` para `CLICK`, preencher `x_var`, `y_var`, `button_var`, restaurar o botão de captura e invocar `draw_fields()` no thread principal via `edit_action_window.after`.
+  - **Scroll**: se ocorrer fora das três janelas, parar os listeners, atualizar `type_var` para `SCROLL`, preencher `dx_var`, `dy_var`, restaurar o botão de captura e invocar `draw_fields()` no thread principal.
+  - **Teclado**: se ocorrer uma tecla pressionada, parar os listeners, atualizar `type_var` para `TYPE`, preencher `text_var` com o caractere/tecla correspondente, restaurar o botão de captura e invocar `draw_fields()` no thread principal.
+
+- **Interface Visual**:
+  - Adicionar o botão **Capturar Passo** na janela `edit_action_window` logo abaixo do menu de seleção do tipo de passo.
+
+## Verification Plan
+
+### Manual Verification
+1. **Contagem Regressiva**:
+   - Abrir o editor de passos e clicar em "Capturar Passo".
+   - Confirmar se o texto do botão muda para "Em 3...", "Em 2...", "Em 1..." segundo a segundo.
+2. **Captura de Clique**:
+   - Após a contagem, clicar em um local externo da tela.
+   - Confirmar se o tipo de passo muda para `CLICK` e se as coordenadas `X` e `Y` corretas são preenchidas no formulário.
+3. **Captura de Scroll**:
+   - Após a contagem, rolar o scroll do mouse em uma janela externa.
+   - Confirmar se o tipo de passo muda para `SCROLL` e os valores de `dx`/`dy` são preenchidos.
+4. **Captura de Digitação**:
+   - Após a contagem, pressionar qualquer tecla (ex: `A`).
+   - Confirmar se o tipo de passo muda para `TYPE` e a letra aparece no campo "Texto para digitar".

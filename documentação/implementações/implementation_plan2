@@ -1,0 +1,61 @@
+# Plano de Implementação: Editor Unificado e Criação de Automações
+
+Este plano visa unificar os botões e janelas de edição em uma única interface clara ("Editar Automação"), permitir a criação de novas automações do zero (sem gravação prévia) e melhorar a consistência dos termos utilizados na interface (usando "Automação" em vez de "Gravação/Clique").
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Janela Única de Edição**: Combinaremos a janela "Editar gravação" (que antes apenas renomeava e mostrava a lista de cliques como texto estático) com a janela "Editar Ações" (lista interativa). A nova janela "Editar Automação" permitirá renomear a automação E editar/deletar/adicionar passos em um único lugar.
+>
+> **Criar do Zero**: Adicionaremos um botão "Nova automação" que cria uma automação vazia no banco de dados e abre o editor imediatamente para que o usuário possa construir os passos manualmente.
+
+## Proposed Changes
+
+### [Click Recorder App UI & Logic](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Mudanças na Interface Principal (`build_ui`)**:
+  - Renomear o título dos frames e botões para consistência com "Automação":
+    - "Registros de Automações" -> "Automações Salvas"
+    - "Executar gravação" -> "Executar automação"
+    - "Excluir gravação" -> "Excluir automação"
+  - Remover o botão duplicado "Editar Ações" (`self.action_button`).
+  - Adicionar o botão "Nova automação" (`self.new_automation_button`) de cor verde (`#4caf50`) ou roxa (`#9c27b0`).
+  - Renomear "Editar gravação" -> "Editar automação" (`self.edit_button`).
+  - Atualizar o layout vertical dos botões no painel esquerdo para acomodar a nova disposição.
+
+- **Fluxo de Criação de Automação (`new_automation`)**:
+  - Solicitar um nome para a nova automação via `simpledialog.askstring`.
+  - Criar um registro com lista de ações vazia (`[]`) no banco de dados.
+  - Atualizar a listbox principal.
+  - Abrir o editor unificado para a nova automação criada.
+
+- **Editor Unificado (`edit_recording` / `edit_automation`)**:
+  - Redesenhar `edit_recording` para ser a interface completa de edição.
+  - A janela terá:
+    - Campo de Entrada: Nome da automação.
+    - Listbox de Ações interativa com barra de rolagem.
+    - Fileira 1 de Botões: "Editar Selecionada", "Deletar Selecionada".
+    - Fileira 2 de Botões: "+ Clique", "+ Digitar", "+ Espera", "+ Ler Arquivo".
+    - Botão "Salvar Todas as Alterações" que valida o nome, atualiza as ações no banco e fecha a janela.
+
+- **Remoção de Código Legado**:
+  - Remover a função `edit_actions` antiga, pois toda a sua lógica será integrada e otimizada dentro da nova função de edição unificada.
+
+## Verification Plan
+
+### Manual Verification
+1. **Executar `.venv/Scripts/python.exe app.py`**.
+2. **Nova Automação**:
+   - Clicar em "Nova automação".
+   - Digitar o nome "Automação Manual Teste" e confirmar.
+   - Verificar se a janela de edição abre com a lista de ações vazia.
+   - Adicionar um "+ Clique" e salvar.
+   - Verificar se aparece listado na janela principal.
+3. **Edição Unificada**:
+   - Selecionar uma automação existente e clicar em "Editar automação".
+   - Renomear a automação e alterar/adicionar passos.
+   - Salvar e validar as alterações no painel e no banco de dados.
+4. **Exclusão**:
+   - Testar o botão "Excluir automação".

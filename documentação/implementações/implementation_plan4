@@ -1,0 +1,54 @@
+# Plano de Implementação: Registro e Reprodução de Rolagem do Mouse (Scroll)
+
+Adicionaremos suporte completo para registrar rolagens do mouse (scroll), agrupá-las para evitar redundâncias, reproduzi-las fielmente na automação e permitir sua edição e criação manual no editor.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Captura e Agrupamento**: Rolagens consecutivas de scroll (que ocorrem em rajadas rápidas) serão agrupadas automaticamente na mesma ação `SCROLL` se o intervalo entre elas for menor que **0.5 segundos** e ocorrerem fora da janela do aplicativo.
+>
+> **Direção da Rolagem**: O editor exibirá orientações claras de que valores positivos rolam para cima e valores negativos para baixo.
+
+## Proposed Changes
+
+### [Action, Listener, Playback, and UI Components](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Atualização da Classe `Action`**:
+  - Adicionar constante `TYPE_SCROLL = "SCROLL"`.
+  - Adicionar atributos `dx` (rolagem horizontal) e `dy` (rolagem vertical) com valor padrão `0` no construtor.
+  - Atualizar `to_dict` e `from_dict` para incluir `dx` e `dy` de forma retrocompatível.
+  - Atualizar `__str__` para representar a rolagem de forma amigável (ex: `"Rolar mouse: cima (12)"` ou `"Rolar mouse: baixo (-8)"`).
+
+- **Captura de Rolagem (`countdown_and_start` e `on_scroll`)**:
+  - Vincular o evento `on_scroll` no `mouse.Listener` global em `countdown_and_start`.
+  - Implementar o método `on_scroll(self, x, y, dx, dy)`:
+    - Ignorar rolagens feitas dentro da janela do aplicativo.
+    - Se a última ação for `SCROLL` e ocorreu há menos de 0.5 segundos, somar os valores de `dx` e `dy` na ação existente.
+    - Caso contrário, criar uma nova ação `SCROLL`.
+
+- **Execução da Rolagem (`playback_clicks`)**:
+  - Adicionar o bloco condicional para o tipo `SCROLL` no loop de reprodução: `controller.scroll(action.dx, action.dy)`.
+
+- **Editor Unificado (`edit_automation`)**:
+  - **Edição**:
+    - Declarar variáveis `dx_var` e `dy_var` no escopo do diálogo `open_edit_dialog`.
+    - No método `draw_fields`, renderizar os campos de entrada numéricos para `dx` e `dy` quando o tipo de ação for `SCROLL`.
+    - Adicionar validação de inteiros para `dx` e `dy` no método `save_action_changes`.
+  - **Criação Manual**:
+    - Adicionar método `add_scroll()` que cria um passo `SCROLL` padrão e abre o diálogo de edição.
+    - Adicionar o botão **+ Rolar** (`add_scroll`) na fileira de botões de inserção de passos do editor.
+
+## Verification Plan
+
+### Manual Verification
+1. **Gravação**:
+   - Iniciar gravação, rolar a roda do mouse para baixo e para cima em uma janela do navegador ou documento.
+   - Parar a gravação, verificar se foi gerado o passo do tipo "Rolar mouse".
+2. **Editor**:
+   - Abrir o editor, selecionar a ação de rolagem e clicar em editar.
+   - Modificar os valores de `dy`, testar a validação digitando letras e salvar.
+   - Usar o botão **+ Rolar** para inserir um scroll manual após um clique e salvar.
+3. **Execução**:
+   - Executar a automação em uma página que possua barra de rolagem e validar se o scroll ocorre na direção configurada.

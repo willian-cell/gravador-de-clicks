@@ -1,0 +1,61 @@
+# Walkthrough: Melhorias e Recursos Avançados no Click Recorder
+
+Implementamos com sucesso todos os recursos planejados para enriquecer a experiência do Click Recorder. Abaixo está uma descrição detalhada de cada alteração e como você pode testar e usar as novas funcionalidades.
+
+## Alterações Realizadas
+
+### 1. Agrupamento Inteligente de Digitação
+- **Antes**: Cada caractere digitado era registrado como uma ação individual `TYPE` no banco de dados. Ao digitar uma palavra, o usuário precisava editar dezenas de passos repetitivos.
+- **Agora**: Ao digitar, as teclas são agrupadas automaticamente no mesmo bloco `TYPE` se o tempo entre elas for menor que **3 segundos** e não houver cliques intermediários.
+- **Correções em tempo real**: O gravador reconhece teclas especiais:
+  - **Espaço**: Adiciona espaço normal.
+  - **Enter**: Adiciona quebra de linha `\n`.
+  - **Backspace**: Remove o último caractere do bloco de digitação atual, permitindo que você corrija erros enquanto grava sem poluir o histórico de ações.
+
+### 2. Nova Ação "Ler Arquivo" (`TYPE_READ_FILE`)
+Permite ler dinamicamente dados de arquivos no disco para digitá-los/escrevê-los no campo de texto ativo. Suporta:
+- **Conteúdo Completo (`complete`)**: Lê o arquivo de texto inteiro e o digita.
+- **Linha Específica (`line`)**: Digita o conteúdo de uma linha específica (1-indexado).
+- **Chave JSON (`json`)**: Lê um arquivo JSON e extrai o valor de uma chave específica (incluindo chaves aninhadas separadas por pontos, ex: `usuario.nome`).
+- **Linha/Coluna CSV (`csv`)**: Lê coordenadas CSV no formato `linha,coluna` (ex: `1,2` para a linha 1, coluna 2) ou digita a primeira correspondência usando o cabeçalho da coluna.
+
+### 3. Editor de Ações Dinâmico e Criação Manual
+- A janela de edição de ação única agora possui um `fields_frame` reativo: os campos de formulário e descrições de ajuda mudam dinamicamente quando você altera o tipo de ação no menu.
+- Adicionado um seletor de arquivos visual com botão **Procurar...** na edição da ação "Ler Arquivo".
+- Adicionados botões dedicados no editor visual para criação de novas ações de forma manual sem precisar gravar:
+  - `+ Clique` (coordenadas e botão do mouse)
+  - `+ Digitar` (texto livre)
+  - `+ Espera` (duração em segundos)
+  - `+ Ler Arquivo` (caminho, modo de leitura e seletor)
+
+### 4. Botão "Parar Execução" no Painel Principal
+- Adicionado o botão **Parar execução** na interface principal (abaixo do botão de reprodução).
+- Fica ativo apenas durante a execução automática.
+- A reprodução foi otimizada para dormir em intervalos de `0.1s` no loop de espera, garantindo que o clique no botão **Parar execução** interrompa a automação de forma instantânea e segura.
+- Adicionado também suporte para execução da ação `TYPE_READ_FILE` durante a reprodução.
+
+---
+
+## Como Testar as Funcionalidades
+
+### Testando o Botão de Parar Execução
+1. Selecione uma gravação longa na lista.
+2. Clique em **Executar gravação**.
+3. O botão **Parar execução** ficará vermelho ativo. Clique nele para interromper a execução instantaneamente.
+
+### Testando a Ação de Leitura de Arquivo
+Criamos 3 arquivos de teste na raiz do projeto para você utilizar:
+1. `teste.txt`
+2. `teste.json`
+3. `teste.csv`
+
+**Para configurar preenchimento de input com arquivo:**
+1. Selecione ou crie um registro e clique em **Editar Ações**.
+2. Adicione uma ação de clique na posição do campo de entrada (ex: clique no campo de texto onde quer preencher).
+3. Clique em **+ Ler Arquivo**.
+4. Clique em **Editar** na nova ação criada.
+5. Selecione o arquivo `teste.json` usando o botão **Procurar...**.
+6. Mude o "Modo de Leitura" para **Chave JSON**.
+7. No campo "Seletor/Índice", digite `usuario.nome`.
+8. Salve a ação e clique em **Salvar Todas as Alterações**.
+9. Ao executar a gravação, a automação clicará no campo e digitará `Danilo Teste JSON`.

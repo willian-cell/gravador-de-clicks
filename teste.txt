@@ -1,0 +1,3 @@
+Este é um texto de teste de leitura de arquivo TXT.
+Segunda linha do arquivo de teste.
+Terceira linha do arquivo de teste.

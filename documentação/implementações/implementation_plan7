@@ -1,0 +1,58 @@
+# Plano de Implementação: Persistência de Perfis (Skills) da IA e Métricas de Execução
+
+Este plano detalha a implementação para salvar "Skills" (perfis de comportamento da IA) de forma persistente no banco de dados SQLite, permitindo que a IA sempre saiba como se comportar com aquele perfil. Também inclui migrações de banco de dados para a tabela `recordings` para rastrear execuções e a exibição dessas métricas na interface.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Compatibilidade Retroativa**: A tabela de gravações (`recordings`) receberá colunas novas (`description`, `last_run_at`, `run_count`). A migração será executada automaticamente ao inicializar o banco de dados sem perda de dados existentes.
+>
+> **Perfis de IA Semeados**: Ao rodar o app pela primeira vez com o novo schema, três perfis padrões de IA ("Disparador WhatsApp", "Mesclador de Notas Fiscais", "Preenchedor de Cadastro") serão inseridos se a tabela estiver vazia.
+>
+> **Edição de Perfis**: O diálogo de passos de IA permitirá selecionar um perfil salvo (preenchendo a caixa de texto de instruções) e também salvar novas instruções como perfil ou excluir perfis existentes.
+
+## Proposed Changes
+
+### [Componente de Banco de Dados e Gerenciamento](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Atualização do `DatabaseManager`**:
+  - Ajustar `init_database` para:
+    1. Realizar migração automática na tabela `recordings` adicionando `description`, `last_run_at`, e `run_count` caso não existam.
+    2. Criar a tabela `skills` com colunas `id`, `name`, `prompt`, `created_at`.
+    3. Semear perfis padrão de IA se a tabela de `skills` estiver vazia.
+  - Criar helpers no `DatabaseManager`:
+    - `get_all_skills(self)`: Retorna lista de perfis salvos.
+    - `add_skill(self, name, prompt)`: Adiciona ou substitui perfil.
+    - `delete_skill(self, name)`: Remove perfil.
+    - `increment_run_count(self, name)`: Soma +1 ao contador `run_count` e define `last_run_at = CURRENT_TIMESTAMP` para uma gravação.
+  - Atualizar consultas SQL em `get_all_recordings` e `get_recording` para incluir as novas colunas.
+
+- **Atualização da Interface Principal (`ClickRecorderApp`)**:
+  - Exibir o contador de execuções na listbox principal no formato: `1. Nome (X passos) [Executado: Yx]`.
+  - Em `execute_recording`, logo antes de iniciar a thread de reprodução, chamar `self.db.increment_run_count(name)` e recarregar a listbox para refletir a nova contagem.
+
+- **Atualização do Editor de Passos (`edit_automation` -> `open_edit_dialog`)**:
+  - Redefinir tamanhos de janela dinâmicos em `draw_fields()` para acomodar os novos campos de perfil:
+    - Modo `excel_merge`: `500x680`.
+    - Outros modos de IA: `500x560`.
+  - Exibir combobox (OptionMenu) para selecionar perfis salvos. Ao selecionar um perfil, a caixa de texto de instruções da IA será atualizada.
+  - Adicionar botões "Salvar Perfil" e "Excluir Perfil" com caixas de diálogo simples (`simpledialog.askstring` e `messagebox.askyesno`) para persistência direta.
+
+## Verification Plan
+
+### Automated Tests
+- Testar a compilação do arquivo `app.py` usando `python -m py_compile app.py`.
+
+### Manual Verification
+1. **Migração do Banco**:
+   - Abrir o app e garantir que o banco `recordings.db` seja migrado sem erros e que a listbox principal carregue normalmente.
+2. **Visualização de Execuções**:
+   - Executar uma automação gravada e verificar se o indicador `[Executado: Xx]` incrementa imediatamente na listbox.
+3. **Seleção e Cadastro de Skills**:
+   - Criar ou editar um Passo de IA.
+   - Verificar se os perfis padrões ("Disparador WhatsApp", etc.) aparecem no OptionMenu.
+   - Escolher um perfil e confirmar se o texto de instruções é preenchido automaticamente.
+   - Alterar o texto de instruções, clicar em "Salvar Perfil", digitar um novo nome e verificar se o perfil agora está disponível no menu.
+   - Deletar um perfil criado e garantir que ele suma da lista.

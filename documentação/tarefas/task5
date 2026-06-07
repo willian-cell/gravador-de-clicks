@@ -1,0 +1,15 @@
+# Lista de Tarefas: Registro e Execução de Rolagem do Mouse (Scroll)
+
+- `[x]` Atualizar a classe `Action` em `app.py` com atributos `dx` e `dy` e suporte a serialização
+- `[x]` Adicionar o evento `on_scroll` no `mouse.Listener` global em `countdown_and_start`
+- `[x]` Implementar o método `on_scroll` com agrupamento inteligente de eventos recentes
+- `[x]` Adicionar suporte para a ação `SCROLL` no loop de reprodução em `playback_clicks`
+- `[x]` Redesenhar a interface do editor para suportar variáveis `dx_var`, `dy_var`, campos e validações de `SCROLL`
+- `[x]` Adicionar o botão "+ Rolar" e o método `add_scroll` no editor
+- `[x]` Testar e validar a gravação e reprodução do scroll manualmente
+
+# Melhoria: Capturar Passo no Editor
+- `[x]` Implementar detecção de coordenadas e filtragem para janelas do Tkinter (`is_inside_window`)
+- `[x]` Implementar a lógica de captura temporária com contagem regressiva de 3s (`start_temp_capture`)
+- `[x]` Adicionar o botão "Capturar Passo" na janela do editor de passo
+- `[x]` Validar a captura de clique, scroll e teclado e preenchimento dos campos

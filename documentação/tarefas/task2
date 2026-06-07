@@ -1,0 +1,7 @@
+# Lista de Tarefas: Editor Unificado e Criação de Automações
+
+- `[x]` Atualizar a interface principal em `build_ui` para usar nomenclatura consistente, remover botão duplicado e redimensionar janela
+- `[x]` Adicionar botão "Nova automação" e implementar o método `new_automation`
+- `[x]` Redesenhar o método `edit_recording` (que agora se chamará `edit_automation`) como o editor unificado de nome e ações
+- `[x]` Remover o método obsoleto `edit_actions`
+- `[x]` Testar e validar a criação, edição e exclusão de automações manualmente

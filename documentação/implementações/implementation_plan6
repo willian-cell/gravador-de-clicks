@@ -1,0 +1,66 @@
+# Plano de Implementação: Configurações Globais, Delays Ajustáveis e Ações com Inteligência Artificial
+
+Adicionaremos suporte para configurações globais persistentes (limites de delay, chave de API da OpenAI), controle aprimorado de velocidade de reprodução (entre 0.5s e um valor máximo configurável) e um novo tipo de passo inteligente (`IA`) capaz de interagir usando Visão/OCR (via GPT-4o), automação Selenium mapeada por IA (GPT-4o-mini) e consolidação avançada de múltiplos arquivos em uma planilha profissional Excel formatted.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **API da OpenAI**: Esta funcionalidade requer uma chave de API válida da OpenAI com acesso aos modelos `gpt-4o` (para visão/OCR e consolidação de arquivos) e `gpt-4o-mini` (para o modo Selenium).
+>
+> **Planilha Profissional**: O modo de mesclagem lerá até 3 arquivos e produzirá um único arquivo Excel `.xlsx` contendo uma tabela profissional com estilo zebrado, cabeçalhos em azul escuro e largura de colunas ajustada automaticamente.
+>
+> **Delay de Reprodução**: Por padrão, o limite máximo de espera entre cliques e teclas será de 10 segundos, mas poderá ser ajustado livremente na tela principal. O limite mínimo enforceado para qualquer delay será de 0.5 segundos (para evitar que cliques muito rápidos não registrem).
+
+## Proposed Changes
+
+### [Database, Main Window, Editor, and Executor Components](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Persistência de Configurações (`DatabaseManager`)**:
+  - Criar tabela `settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`.
+  - Adicionar métodos `get_setting(key, default)` e `set_setting(key, value)` usando `INSERT OR REPLACE`.
+
+- **Atualização da Classe `Action`**:
+  - Adicionar constante `TYPE_AI = "IA"`.
+  - Adicionar propriedades ao construtor: `ai_task`, `ai_mode` (default `"ocr"`), `file_path_2`, `file_path_3` e `output_path`.
+  - Atualizar serialização (`to_dict`, `from_dict`) e `__str__` para o novo tipo de ação.
+
+- **Interface Principal (`build_ui`)**:
+  - Adicionar o painel **Configurações Globais** no canto inferior direito da tela.
+  - Campos de entrada: "Espera Máxima (s)" (padrão 10.0) e "OpenAI API Key" (do tipo senha `*`).
+  - Botão "Salvar" para gravar as opções no banco de dados.
+
+- **Controle de Delay de Playback (`playback_clicks`)**:
+  - Ler o valor da variável de "Espera Máxima" (limitar entre 0.5s e o valor configurado).
+  - Cipar o tempo de delay dos passos usando esses limites antes de entrar na rotina de espera.
+
+- **Edição Dinâmica no Diálogo (`open_edit_dialog`)**:
+  - Adicionar variáveis: `ai_task_var`, `ai_mode_var`, `file_path_2_var`, `file_path_3_var`, `output_path_var`.
+  - Em `draw_fields()`, incluir layout para o tipo `IA`:
+    - OptionMenu para escolher o modo (`ocr`, `selenium`, `excel_merge`).
+    - Área de texto para a "Tarefa/Skill da IA" (prompt).
+    - Exibir campos para múltiplos arquivos de entrada e saída se o modo for `excel_merge`.
+    - Ajustar a geometria da janela dinamicamente (`500x600` para mesclagem de arquivos, `500x450` para outros modos de IA, `480x420` para os passos comuns).
+  - Adicionar o botão **+ Passo IA** na fileira de botões de inserção.
+
+- **Executor da IA (`run_ai_action` e `playback_clicks`)**:
+  - Integrar a execução do passo `IA` em `playback_clicks`.
+  - Implementar o método `run_ai_action(action)`:
+    - **Modo OCR**: Tira captura de tela, codifica em Base64, envia para a API da OpenAI com a resolução do monitor física (usando `ctypes`) para mapear cliques absolutos, recebe coordenadas `(X, Y)` e digitações em JSON e as executa com o mouse/teclado.
+    - **Modo Selenium**: Varre a página web em busca de inputs/buttons/textareas ativos, envia os metadados dos inputs para a API do ChatGPT-4o-mini junto com a tarefa, recebe quais IDs/names clicar/escrever e os executa via Selenium.
+    - **Modo Mesclar Arquivos**: Lê até 3 arquivos locais (CSV, texto), envia para a OpenAI com as instruções de formatação/consolidação e grava em um arquivo Excel usando `openpyxl` formatado profissionalmente (tabela zebrada, fonte Arial, cabeçalhos estilizados, ajuste de coluna automático).
+
+## Verification Plan
+
+### Manual Verification
+1. **Configurações**:
+   - Inserir valores nos campos de Espera Máxima e API Key e clicar em salvar. Reabrir o app e certificar que as configurações foram salvas e carregadas com sucesso do SQLite.
+2. **Capping de Delays**:
+   - Criar uma automação com grande atraso entre cliques, e rodar a reprodução. Verificar se a velocidade de execução respeita o teto de 10 segundos configurado.
+3. **Editor de IA**:
+   - Abrir o editor de passos, clicar em **+ Passo IA** e verificar se a janela se ajusta à altura do modo selecionado.
+   - Alternar os modos de IA e confirmar que os campos de múltiplos arquivos e pastas aparecem apenas no modo "Mesclar Arquivos para Excel".
+4. **Execução IA (OCR / Selenium / Excel Merge)**:
+   - Testar o modo OCR disparando uma tarefa simples na tela.
+   - Testar o modo Excel Merge lendo 3 arquivos e confirmando a criação de um único `.xlsx` com visual profissional formatado.

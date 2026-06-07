@@ -1,0 +1,44 @@
+# Walkthrough: Persistência de Perfis (Skills) da IA e Métricas de Execução
+
+Adicionamos suporte para salvar **Perfis da IA (Skills)** no banco de dados SQLite de forma persistente, permitindo que a IA sempre saiba como se comportar com aquele perfil. Também implementamos rastreamento de execuções de automação (`run_count`) e visualização dessas métricas na interface.
+
+---
+
+## Novos Recursos Implementados
+
+### 1. Persistência de Perfis de IA (Skills)
+* **Tabela `skills`**: Criamos a tabela `skills` no banco `recordings.db` para armazenar perfis de IA contendo `name` (nome do perfil) e `prompt` (instruções/diretrizes de comportamento).
+* **Perfis Padrões Semeados**: Se a tabela estiver vazia, o sistema semeia automaticamente três perfis básicos de uso comum:
+  1. **Disparador WhatsApp**: Focado em buscar contatos, digitar e enviar mensagens.
+  2. **Mesclador de Notas Fiscais**: Focado em extrair dados de NF-e e estruturar planilhas.
+  3. **Preenchedor de Cadastro**: Focado em ler dados e preencher formulários desktop/web.
+
+### 2. Migração de Banco e Rastreamento de Execução
+* **Migração Automática**: Ao iniciar o aplicativo, o banco de dados executa uma migração segura para adicionar as colunas `description` (TEXT), `last_run_at` (TIMESTAMP) e `run_count` (INTEGER) na tabela de gravações (`recordings`), caso ainda não existam. Isto garante que gravações existentes não sejam corrompidas nem perdidas.
+* **Contador de Execuções (`run_count`)**: Toda vez que o usuário executa uma automação, o sistema incrementa o contador de execuções e registra o timestamp da última execução.
+* **Exibição na Listbox**: A lista principal de automações agora exibe o contador no formato: `X. Nome da Automação (N passos) [Executado: Yx]`.
+
+### 3. Integração de Perfis no Editor de Passos
+* **Seletor de Perfil (Combobox)**: Ao adicionar ou editar um Passo de IA, um OptionMenu exibe todos os perfis cadastrados no banco.
+* **Preenchimento Automático**: Ao selecionar um perfil, a caixa de texto de instruções da IA é preenchida instantaneamente com a diretriz do perfil correspondente.
+* **Gerenciamento Completo de Perfis**:
+  * **Salvar como Perfil**: O usuário pode redigir instruções e clicar no botão "Salvar como Perfil" para cadastrar um novo perfil persistente.
+  * **Excluir Perfil Selecionado**: Remove o perfil ativo do banco de dados após confirmação.
+* **Ajuste Geométrico Dinâmico**: A janela de diálogo de passo ajusta-se automaticamente para acomodar os novos campos (`500x560` para OCR/Selenium e `500x680` para Excel Merge).
+
+---
+
+## Como Testar os Novos Recursos
+
+### 1. Verificar a Migração e Contadores
+1. Abra o aplicativo. Note que a listbox agora exibe o sufixo `[Executado: 0x]` para gravações que nunca foram executadas.
+2. Selecione uma gravação e clique em **Executar Automação**. O contador mudará para `[Executado: 1x]` imediatamente após a confirmação.
+
+### 2. Utilizar Perfis (Skills) no Passo de IA
+1. Edite uma automação existente ou crie uma nova e adicione um **Passo IA**.
+2. Altere o tipo do passo para **IA**.
+3. Clique em **Perfil de IA (Skill)** e escolha um dos perfis pré-cadastrados (ex: *"Disparador WhatsApp"*).
+4. Veja que o campo de instruções é automaticamente preenchido com a diretriz daquela Skill.
+5. Edite a instrução se desejar e clique em **Salvar como Perfil**. Insira um nome (ex: *"Preenchimento Web Customizado"*).
+6. O novo perfil ficará disponível para seleção imediata no menu de perfis.
+7. Para excluir, selecione o perfil no menu e clique em **Excluir Perfil Selecionado**.

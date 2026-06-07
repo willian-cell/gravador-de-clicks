@@ -1,0 +1,7 @@
+# Lista de Tarefas: Melhorias de Edição, Gravação e Validação
+
+- `[x]` Implementar o filtro de cliques internos na janela do app no método `on_click`
+- `[x]` Adicionar validação de entradas numéricas no método `save_action_changes` do editor
+- `[x]` Implementar reordenação (`move_up`, `move_down`) e duplicação (`duplicate_action`) no editor
+- `[x]` Adicionar botões ("Duplicar", "↑ Subir", "↓ Descer") na interface do editor `edit_automation`
+- `[x]` Testar e validar todas as melhorias manualmente

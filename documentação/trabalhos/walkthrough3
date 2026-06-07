@@ -1,0 +1,46 @@
+# Walkthrough: Melhorias de Edição, Gravação e Validação no Click Recorder
+
+Implementamos com sucesso três melhorias avançadas de alto impacto no Click Recorder:
+1. **Reordenação e Duplicação de Passos** (↑ Subir, ↓ Descer, Duplicar).
+2. **Filtro de Cliques Internos na Janela do App** (elimina cliques de interface "lixo").
+3. **Validação de Inputs** (coordenadas e durações) no salvamento do editor.
+
+---
+
+## Novos Recursos Implementados
+
+### 1. Botões "Duplicar", "↑ Subir" e "↓ Descer" no Editor
+- Adicionamos três novos botões na barra de operações superiores do editor unificado:
+  - **Duplicar**: Selecione um passo na lista e clique em "Duplicar". O aplicativo criará uma cópia exata do passo (com mesmas coordenadas, textos, etc.) logo abaixo dele e a selecionará automaticamente.
+  - **↑ Subir**: Move o passo selecionado para cima na ordem da automação. A lista é reordenada e atualiza os números dos passos instantaneamente.
+  - **↓ Descer**: Move o passo selecionado para baixo na ordem da automação.
+- O aplicativo mantém o foco e a seleção no passo movido/duplicado, permitindo que você organize uma sequência inteira rapidamente com cliques consecutivos nos botões.
+
+### 2. Filtro Automático de Cliques Internos
+- **Antes**: Ao clicar no botão vermelho "Parar gravação" no aplicativo, esse clique era registrado como o passo final de toda automação (gerando cliques inúteis no layout da automação).
+- **Agora**: Ao registrar cliques globais, o aplicativo calcula se o clique ocorreu dentro da área (posição e dimensões) da janela principal do Click Recorder. Se ocorrer, o clique é **ignorado automaticamente**. Isso mantém suas automações 100% limpas de interações com a interface de controle do próprio aplicativo!
+
+### 3. Validação de Entradas do Editor
+- Ao salvar as alterações de um passo no editor, o aplicativo agora valida o tipo dos dados:
+  - **Cliques**: Bloqueia se a coordenada `X` ou `Y` conter letras ou for vazia.
+  - **Espera**: Garante que o valor da duração seja um número válido e maior ou igual a zero.
+  - **Ler Arquivo**: Garante que o caminho do arquivo seja selecionado e que seletores (como no modo Linha) sejam números válidos.
+- Se houver algum erro de digitação, o editor exibe uma caixa de diálogo amigável contendo o aviso de validação (ex: *"A coordenada X deve ser um número inteiro."*) em vez de salvar dados corrompidos que travam a execução automática depois.
+
+---
+
+## Como Testar as Novas Funcionalidades
+
+### Testando Reordenação e Duplicação
+1. Abra a janela de edição de uma automação existente.
+2. Clique em qualquer passo da lista (ex: passo 3).
+3. Clique em **Duplicar**; uma cópia exata aparecerá como passo 4.
+4. Com a cópia selecionada, clique em **↑ Subir** algumas vezes e note que o passo sobe de posição dinamicamente na lista.
+5. Clique em **Salvar Todas as Alterações**.
+
+### Testando o Filtro de Janela
+1. Inicie uma nova gravação no painel principal.
+2. Clique algumas vezes na sua área de trabalho ou navegador.
+3. Clique à vontade dentro da janela do Click Recorder (como arrastar a janela ou clicar em partes vazias do painel).
+4. Clique em **■ Parar gravação**.
+5. Salve e edite a automação; note que nenhum dos cliques na janela do aplicativo (incluindo o clique de parada) foi registrado.

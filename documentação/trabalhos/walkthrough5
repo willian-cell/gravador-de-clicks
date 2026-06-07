@@ -1,0 +1,66 @@
+# Walkthrough: Registro e Execução de Rolagem do Mouse (Scroll)
+
+Implementamos com sucesso o suporte completo para registrar, agrupar, editar e reproduzir rolagens do mouse (scroll) nas automações do Click Recorder.
+
+---
+
+## Recursos Implementados
+
+### 1. Gravação e Agrupamento Dinâmico de Scroll
+- **Gravação Global**: O listener global de mouse foi atualizado para capturar movimentos da roda de rolagem do mouse (`on_scroll`), ignorando rolagens dentro da janela do Click Recorder.
+- **Agrupamento Inteligente**: Rolagens consecutivas em rajadas rápidas (como ao girar a roda do mouse continuamente) são consolidadas em uma única ação `SCROLL` caso o intervalo entre elas seja menor que **0.5 segundos**. Os deltas horizontais (`dx`) e verticais (`dy`) são somados automaticamente na última ação para evitar poluir a automação com centenas de registros.
+
+### 2. Edição de Scroll no Editor Unificado
+- **Campos Dinâmicos**: Ao selecionar um passo do tipo "Rolar mouse" no editor, campos para ajustar o deslocamento horizontal (`dx`) e o deslocamento vertical (`dy`) são exibidos.
+- **Validação Robustas**: Entradas inválidas (letras ou campos vazios) são rejeitadas com avisos de validação.
+- **Dicas Visuais**: O editor explica claramente o comportamento dos valores (`dy` positivo para cima, negativo para baixo; `dx` positivo para direita, negativo para esquerda).
+
+### 3. Criação Manual de Rolagem
+- Adicionado o botão **+ Rolar** na barra de inserção de passos do editor.
+- Clicar no botão cria um passo do tipo `SCROLL` padrão (`dx=0`, `dy=0`) inserido logo após o passo selecionado.
+
+### 4. Reprodução de Scroll (Playback)
+- Integrado o tipo de ação `SCROLL` no executor (`playback_clicks`).
+- A reprodução utiliza `controller.scroll(dx, dy)` do `pynput` para mover e rolar as páginas ou aplicativos externos conforme gravado.
+
+---
+
+## Validação e Testes Realizados
+
+1. **Testes de Atributos e Banco de Dados (Passou)**:
+   - Executamos um script automatizado de teste local que validou a criação de ações do tipo `SCROLL`, a conversão para dicionário (e vice-versa), e a persistência correta de `dx` e `dy` no banco de dados SQLite.
+2. **Compilação e Sintaxe (Passou)**:
+   - Validamos o arquivo `app.py` com o compilador do Python para assegurar que nenhuma alteração causou problemas sintáticos.
+
+---
+
+## Como Utilizar o Recurso de Rolagem
+
+### Gravar Rolagem
+1. Clique em **Iniciar gravação** no painel principal.
+2. Mova o cursor do mouse para um aplicativo externo (por exemplo, um navegador web ou documento) e role a roda do mouse.
+3. Volte e clique em **■ Parar gravação**. A automação conterá os passos `"Rolar mouse: ... (dy: X, dx: Y)"`.
+
+### Adicionar e Editar Manualmente
+1. No painel de gravações, selecione uma gravação e clique em **Editar automação**.
+2. Clique no botão **+ Rolar** para adicionar uma nova rolagem na sequência.
+3. Selecione a ação de rolagem na lista e clique em **Editar Selecionado**.
+4. Defina os valores desejados para `dx` e `dy` (ex: `dy = -10` para rolar bastante para baixo).
+5. Salve o passo e clique em **Salvar Todas as Alterações**.
+
+---
+
+## Novo Recurso: Capturar Passo no Editor
+
+Adicionamos a capacidade de capturar dinamicamente uma única ação do usuário diretamente na janela de edição/criação de passo.
+
+### Como Funciona:
+1. Ao editar ou criar um novo passo (como por exemplo, ao clicar em **+ Clique**, **+ Digitar** ou **+ Rolar** no editor de automação), a tela de edição do passo agora exibe o botão **Capturar Passo** ao lado do menu "Tipo de Passo".
+2. Ao clicar em **Capturar Passo**, o botão iniciará uma contagem regressiva de 3 segundos (`Capturando em 3... 2... 1...`), dando tempo para você posicionar o mouse ou preparar a tecla a ser capturada fora das janelas do Click Recorder.
+3. Após o término da contagem, o botão exibirá `"Aguardando ação..."`. A partir deste momento, a primeira ação válida realizada fora do aplicativo (seja um clique de mouse, rolagem ou digitação de tecla) será capturada.
+4. O diálogo preencherá automaticamente o tipo do passo e todas as informações pertinentes:
+   - **Cliques**: tipo muda para `CLICK`, preenchendo coordenadas `X` e `Y` e o botão do mouse.
+   - **Rolagens**: tipo muda para `SCROLL`, preenchendo `dx` e `dy`.
+   - **Teclado**: tipo muda para `TYPE`, preenchendo a caixa de texto com o caractere digitado.
+5. As janelas do aplicativo (janela principal, janela de listagem de passos e janela de edição do passo) são automaticamente ignoradas nas verificações de clique/scroll para evitar capturas acidentais de elementos do próprio aplicativo.
+6. A captura é protegida contra vazamento de recursos e encerra os listeners imediatamente se o diálogo for fechado.

@@ -1,0 +1,24 @@
+# Lista de Tarefas: Registro e Execução de Rolagem do Mouse (Scroll)
+
+- `[x]` Atualizar a classe `Action` em `app.py` com atributos `dx` e `dy` e suporte a serialização
+- `[x]` Adicionar o evento `on_scroll` no `mouse.Listener` global em `countdown_and_start`
+- `[x]` Implementar o método `on_scroll` com agrupamento inteligente de eventos recentes
+- `[x]` Adicionar suporte para a ação `SCROLL` no loop de reprodução em `playback_clicks`
+- `[x]` Redesenhar a interface do editor para suportar variáveis `dx_var`, `dy_var`, campos e validações de `SCROLL`
+- `[x]` Adicionar o botão "+ Rolar" e o método `add_scroll` no editor
+- `[x]` Testar e validar a gravação e reprodução do scroll manualmente
+
+# Melhoria: Capturar Passo no Editor
+- `[x]` Implementar detecção de coordenadas e filtragem para janelas do Tkinter (`is_inside_window`)
+- `[x]` Implementar a lógica de captura temporária com contagem regressiva de 3s (`start_temp_capture`)
+- `[x]` Adicionar o botão "Capturar Passo" na janela do editor de passo
+- `[x]` Validar a captura de clique, scroll e teclado e preenchimento dos campos
+
+# Configurações Globais, Delays Ajustáveis e Ações Inteligentes com IA
+- `[x]` Criar a tabela `settings` e métodos `get_setting` e `set_setting` em `DatabaseManager`
+- `[x]` Atualizar a classe `Action` com propriedades da IA (`ai_task`, `ai_mode`, `file_path_2`, `file_path_3`, `output_path`)
+- `[x]` Adicionar painel de Configurações Globais na UI principal do aplicativo
+- `[x]` Ajustar cálculo de delay em `playback_clicks` usando os limites configurados (mínimo 0.5s, máximo de 10s configurável)
+- `[x]` Implementar design visual dinâmico do editor de passos (altura flexível, suporte a "excel_merge" com arquivos múltiplos)
+- `[x]` Implementar método `run_ai_action` com suporte aos modos OCR (GPT-4o), Selenium (GPT-4o-mini) e Excel Merge (openpyxl)
+- `[x]` Validar a mesclagem de planilhas e a execução dos passos de IA
