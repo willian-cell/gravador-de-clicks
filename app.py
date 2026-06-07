@@ -482,7 +482,7 @@ class ClickRecorderApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gravador de Cliques com Agente IA")
-        self.root.geometry("1100x660")
+        self.root.geometry("1150x680")
         self.root.resizable(True, True)
 
         self.db = DatabaseManager()
@@ -572,7 +572,7 @@ class ClickRecorderApp:
         # Seção Selenium
         if SELENIUM_AVAILABLE:
             tk.Label(middle_frame, text="Automação Web (Selenium)", font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=(20, 5))
-            self.selenium_button = tk.Button(middle_frame, text="Abrir Navegador Automatizado", command=self.open_selenium, width=22, bg="#9c27b0", fg="white", font=("Arial", 10, "bold"))
+            self.selenium_button = tk.Button(middle_frame, text="Abrir Navegador Automatizado", command=self.open_selenium, width=26, bg="#9c27b0", fg="white", font=("Arial", 10, "bold"))
             self.selenium_button.pack(pady=(0, 10))
 
         # Configurações Globais
@@ -589,9 +589,27 @@ class ClickRecorderApp:
         self.api_key_entry = tk.Entry(config_frame, textvariable=self.api_key_var, width=22, show="*")
         self.api_key_entry.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
 
+        # Prompt de Sistema / Skill Base do Agente
+        skill_frame = tk.LabelFrame(middle_frame, text="Prompt de Sistema / Skill Base do Agente", font=("Arial", 11, "bold"), padx=10, pady=5)
+        skill_frame.pack(fill=tk.X, pady=(10, 0), side=tk.BOTTOM)
+
+        self.skill_text = tk.Text(skill_frame, height=4, font=("Arial", 9), wrap=tk.WORD)
+        self.skill_text.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        default_prompt = (
+            "Você é um agente de computador autônomo inteligente. A janela do aplicativo "
+            "'Click Recorder com Agente IA' é a sua interface de controle. Se ela ou qualquer "
+            "outra janela estiver cobrindo o aplicativo ou botão que você precisa interagir, "
+            "você pode minimizá-la (clicando no botão '-' no canto superior direito) ou arrastá-la. "
+            "Seja extremamente preciso."
+        )
+        saved_prompt = self.db.get_setting("agent_system_prompt", default_prompt)
+        self.skill_text.insert(tk.END, saved_prompt)
+
         def save_global_configs():
             self.db.set_setting("max_wait_delay", self.max_wait_var.get())
             self.db.set_setting("openai_api_key", self.api_key_var.get())
+            self.db.set_setting("agent_system_prompt", self.skill_text.get("1.0", tk.END).strip())
             messagebox.showinfo("Configurações", "Configurações globais salvas com sucesso!")
 
         tk.Button(config_frame, text="Salvar", command=save_global_configs, bg="#4caf50", fg="white", font=("Arial", 9, "bold"), width=8).grid(row=1, column=2, padx=10, pady=5)
@@ -606,6 +624,18 @@ class ClickRecorderApp:
         self.agent_status_var = tk.StringVar(value="Status: Inativo")
         self.agent_status_lbl = tk.Label(chat_frame, textvariable=self.agent_status_var, font=("Arial", 9, "italic"), bg="#f5f5f5", fg="gray")
         self.agent_status_lbl.pack(anchor=tk.W, pady=(0, 5))
+
+        self.minimize_var = tk.BooleanVar(value=True)
+        self.minimize_chk = tk.Checkbutton(
+            chat_frame, 
+            text="Minimizar janela do app ao iniciar o agente", 
+            variable=self.minimize_var, 
+            font=("Arial", 9), 
+            bg="#f5f5f5", 
+            activebackground="#f5f5f5",
+            anchor=tk.W
+        )
+        self.minimize_chk.pack(fill=tk.X, anchor=tk.W, pady=(0, 5))
 
         chat_history_frame = tk.Frame(chat_frame)
         chat_history_frame.pack(fill=tk.BOTH, expand=True, pady=5)
@@ -1864,6 +1894,13 @@ class ClickRecorderApp:
         self.agent_status_var.set("Status: Pensando...")
         self.append_chat_message("Agente", f"Iniciando tarefa [{ai_mode}]: '{task_description}'")
 
+        # Minimiza a janela principal do app antes de iniciar se o checkbox estiver ativo
+        minimized_by_agent = False
+        if self.minimize_var.get():
+            self.root.iconify()
+            time.sleep(0.6) # Aguarda animação de minimização do SO
+            minimized_by_agent = True
+
         import requests
         from PIL import ImageGrab
         import io
@@ -2053,7 +2090,14 @@ class ClickRecorderApp:
                     screenshot.save(buffer, format="JPEG", quality=80)
                     img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
+                    custom_skill = self.db.get_setting("agent_system_prompt", "").strip()
+                    if custom_skill:
+                        custom_skill_block = f"=== SKILL BASE / DIRETRIZES DO AGENTE ===\n{custom_skill}\n=========================================\n\n"
+                    else:
+                        custom_skill_block = ""
+
                     prompt = (
+                        f"{custom_skill_block}"
                         f"Você é um robô de RPA inteligente executando em loop autônomo. O usuário quer que você execute a seguinte tarefa: '{task_description}'.\n"
                         f"Temos dados de um arquivo local que podem ser relevantes:\n"
                         f"=== DADOS DO ARQUIVO ===\n{file_content_1}\n========================\n\n"
@@ -2117,7 +2161,14 @@ class ClickRecorderApp:
                         except Exception:
                             pass
 
+                    custom_skill = self.db.get_setting("agent_system_prompt", "").strip()
+                    if custom_skill:
+                        custom_skill_block = f"=== SKILL BASE / DIRETRIZES DO AGENTE ===\n{custom_skill}\n=========================================\n\n"
+                    else:
+                        custom_skill_block = ""
+
                     prompt = (
+                        f"{custom_skill_block}"
                         f"Você é um assistente de automação web Selenium executando em loop autônomo. O usuário quer executar a tarefa: '{task_description}'.\n"
                         f"Temos dados de um arquivo local relevante:\n"
                         f"=== DADOS DO ARQUIVO ===\n{file_content_1}\n========================\n\n"
@@ -2174,6 +2225,12 @@ class ClickRecorderApp:
                     break
 
                 if response_json.get("waiting_for_user", False):
+                    # Restaura a janela principal do app para o usuário poder responder no chat
+                    if minimized_by_agent:
+                        self.root.deiconify()
+                        self.root.lift()
+                        self.root.focus_force()
+                        minimized_by_agent = False
                     self.user_message_event.clear()
                     self.agent_status_var.set("Status: Aguardando resposta do usuário...")
                     while self.playing and not self.user_message_event.is_set():
@@ -2181,6 +2238,12 @@ class ClickRecorderApp:
                     
                     if not self.playing:
                         break
+                    
+                    # Se o usuário respondeu e o checkbox ainda está marcado, minimiza novamente
+                    if self.minimize_var.get():
+                        self.root.iconify()
+                        time.sleep(0.6)
+                        minimized_by_agent = True
                     continue
 
                 # Executa ações
@@ -2259,6 +2322,11 @@ class ClickRecorderApp:
             self.append_chat_message("Sistema", f"Erro crítico na execução do agente: {str(e)}")
             print(f"Erro no agente autônomo: {e}")
         finally:
+            # Restaura a janela se ela estiver minimizada
+            if minimized_by_agent:
+                self.root.deiconify()
+                self.root.lift()
+                self.root.focus_force()
             self.agent_active = False
             self.playing = False
             self.agent_status_var.set("Status: Inativo")

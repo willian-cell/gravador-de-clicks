@@ -1,0 +1,55 @@
+# Walkthrough: Agente de IA Autônomo e Conversacional com Painel de Chat
+
+Transformamos o Click Recorder em uma workspace de automação inteligente e conversacional. Agora o sistema conta com um **Painel de Chat integrado** para comunicação direta com a IA, e qualquer passo do tipo IA (seja ativado em uma gravação ou disparado diretamente via chat) executa de forma autônoma em loop, conversando com o usuário e realizando ações na tela até cumprir o objetivo.
+
+---
+
+## Novos Recursos Implementados
+
+### 1. Painel de Chat Integrado (Workspace de Três Colunas)
+* **Redesenho do App**: Expandimos a largura da janela do aplicativo (`1100x660`) para dispor os painéis lado a lado de forma harmônica:
+  * **Coluna 1 (Esquerda)**: Listagem e gerenciamento das automações gravadas.
+  * **Coluna 2 (Centro)**: Controles de gravação comuns e painel de Configurações Globais.
+  * **Coluna 3 (Direita)**: **Painel do Agente IA** contendo:
+    * Histórico de conversas scrollável, com formatação destacando mensagens de você, do agente e do sistema.
+    * Indicador de Status dinâmico (ex: *Status: Pensando...*, *Status: Aguardando resposta do usuário...*, *Status: Inativo*).
+    * Campo de entrada de texto com envio ao pressionar a tecla `Enter` ou clicar em `Enviar`.
+
+### 2. Loop de Execução Autônoma do Agente
+* **Loop Inteligente de Visão (GPT-4o)**: Em vez de tirar apenas uma captura estática e parar, o Agente de IA executa em loop (até 12 iterações por tarefa).
+* **Fluxo de Iteração**:
+  1. O agente captura a tela atual (com suporte completo a DPI Awareness).
+  2. Envia a imagem e o histórico recente do chat para o **GPT-4o**.
+  3. A IA retorna uma mensagem em português descrevendo seus pensamentos atuais e se o objetivo foi cumprido (`completed: true`).
+  4. Caso não tenha concluído, a IA retorna uma lista de ações de cliques físicos, digitação, rolagens do mouse ou esperas para executar na tela.
+  5. O robô simula as ações com intervalos e delays físicos seguros (resolvendo o problema de cliques rápidos/ignorados).
+  6. O loop reinicia até concluir a tarefa.
+
+### 3. Comunicação Interativa Bidirecional
+* **Pausa para Entrada do Usuário**: Se a IA precisar de ajuda ou de alguma informação que não está visível (ex: senha de verificação, ou confirmação de qual link clicar), ela define `waiting_for_user: true` no retorno JSON.
+* **Sincronização de Threads**: A thread do robô pausa automaticamente e o status muda para *Aguardando resposta...*. Assim que o usuário digita no chat e clica em **Enviar**, a thread é liberada com segurança e o agente analisa o novo print junto com a orientação enviada.
+
+### 4. Comandos Livres Diretos pelo Chat
+* **Agente de Verdade**: Se você digitar qualquer comando livre no chat (ex: *"Abra o Chrome e pesquise por clima de hoje"* ou *"Abra o Bloco de Notas e digite Olá Mundo"*), o sistema ativa o agente autônomo na mesma hora.
+* **Autonomia Completa**: O agente tomará o controle do mouse e do teclado livremente para executar o seu pedido passo a passo até finalizar.
+* **Passos IA em Gravações**: Passos de IA gravados nas automações agora chamam essa mesma inteligência conversacional autônoma automaticamente durante o playback.
+
+---
+
+## Como Testar os Novos Recursos
+
+### 1. Usar a IA Livremente via Chat (Comando Direto)
+1. Insira a sua chave da OpenAI no painel central e clique em **Salvar**.
+2. Deixe o sistema no modo inativo (sem gravar ou reproduzir).
+3. No campo de chat no canto inferior direito, digite um comando como:
+   * *"Abra o Bloco de Notas e digite que a IA funciona perfeitamente"*
+4. Clique em **Enviar** ou aperte `Enter`.
+5. Observe o chat: o agente começará a descrever suas ações em português, tirará capturas de tela e executará a movimentação do mouse e teclado na tela até concluir a tarefa.
+6. Se quiser cancelar no meio, basta clicar no botão **Parar Execução** no painel central.
+
+### 2. Testar Interação Conversacional (Pausa/Aguardar Entrada)
+1. No chat, dê uma instrução que exija a sua resposta, por exemplo:
+   * *"Me pergunte no chat qual site você deve pesquisar antes de abrir o navegador"*
+2. Observe que a IA mandará a pergunta no chat, pausará a execução física do robô, e o status mudará para *"Aguardando resposta do usuário..."*.
+3. Digite *"Pesquise por Google"* no chat e envie.
+4. O robô retomará a execução instantaneamente com a sua nova resposta e abrirá o site.
