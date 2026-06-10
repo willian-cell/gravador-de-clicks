@@ -1,0 +1,48 @@
+# Plano de Implementação: Calibração Cirúrgica e Suporte a Múltiplos Monitores no Agente IA
+
+Este plano descreve como corrigiremos os desvios de cliques do Agente de IA. O sistema passará a suportar múltiplos monitores de forma nativa e automática (capturando todo o desktop virtual) e alinhará cirurgicamente as coordenadas da tela lógica com a física, resolvendo quaisquer desvios de cliques em layouts de alta densidade (DPI) e em múltiplos displays.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Captura de Múltiplos Monitores (`all_screens=True`)**: O agente agora capturará o desktop completo (todas as telas conectadas) em vez de apenas a tela principal. Isso permite que ele opere em janelas que estão em monitores secundários.
+>
+> **Calibração de Resolução Virtual**: As dimensões de tela informadas ao modelo do GPT-4o passarão a usar a largura e altura virtuais totais (`CXVIRTUALSCREEN` e `CYVIRTUALSCREEN`). Se houver qualquer divergência de tamanho físico e lógico, o screenshot será cirurgicamente redimensionado para as coordenadas lógicas.
+>
+> **Salvaguarda de Limites de Clique**: As coordenadas de clique (`x` e `y`) retornadas pela IA serão sanitizadas e limitadas aos limites físicos da área de trabalho ativa para evitar erros de cursor fora da tela.
+
+## Proposed Changes
+
+### [Alinhamento de Coordenadas e Múltiplos Monitores](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Medição de Tela Virtual (`run_autonomous_agent`)**:
+  - Em vez de usar `GetSystemMetrics(0)` e `GetSystemMetrics(1)` (que retornam apenas a tela principal), usar `GetSystemMetrics(78)` (largura virtual) e `GetSystemMetrics(79)` (altura virtual).
+  - Adicionar fallback para a tela principal caso o retorno virtual seja nulo ou inválido.
+
+- **Captura Completa (`ImageGrab.grab(all_screens=True)`)**:
+  - Habilitar `all_screens=True` na captura do screenshot do robô.
+  - Redimensionar cirurgicamente a imagem capturada para o tamanho lógico da tela virtual caso haja alguma divergência de escala (DPI) entre o print físico e as coordenadas de mouse lógicas do Windows:
+    ```python
+    screenshot = ImageGrab.grab(all_screens=True)
+    if screenshot.size != (screen_w, screen_h):
+        screenshot = screenshot.resize((screen_w, screen_h), Image.Resampling.LANCZOS)
+    ```
+
+- **Saturação e Validação de Coordenadas**:
+  - Na execução da ação `click`, converter `x` e `y` para inteiros e limitá-los entre `0` e `screen_w - 1` / `screen_h - 1` respectivamente.
+  - Adicionar instruções explícitas no prompt de OCR para orientar a IA a estimar o pixel exato do centro do elemento alvo.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Validar a compilação do código com `python -m py_compile app.py`.
+
+### Manual Verification
+1. **Verificação de Dimensões**:
+   - Rodar o robô e conferir se ele consegue interagir com aplicativos no monitor secundário.
+2. **Precisão do Clique**:
+   - Mandar o agente clicar em um link pequeno ou botão em qualquer um dos monitores e confirmar que a mira do mouse cai perfeitamente no centro do botão.

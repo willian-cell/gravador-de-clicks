@@ -1,0 +1,9 @@
+# Lista de Tarefas: Calibração de Cliques e Múltiplos Monitores
+
+- `[x]` Obter dimensões de tela virtuais (`CXVIRTUALSCREEN`/`CYVIRTUALSCREEN`) em `run_autonomous_agent`
+- `[x]` Capturar a área de trabalho virtual completa com `ImageGrab.grab(all_screens=True)`
+- `[x]` Implementar o redimensionamento dinâmico da captura para correspondência de coordenadas lógicas/físicas
+- `[x]` Sanitizar e limitar (`clamp`) as coordenadas de clique retornadas pelo agente aos limites da tela virtual
+- `[x]` Injetar instruções de precisão de coordenadas no prompt do agente IA
+- `[x]` Compilar e validar sintaxe de `app.py`
+- `[x]` Atualizar `walkthrough.md` com as instruções de teste de múltiplos monitores e precisão de clique (Pronto para validação do usuário)

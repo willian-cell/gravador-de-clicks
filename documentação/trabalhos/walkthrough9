@@ -1,0 +1,50 @@
+# Walkthrough: Melhorias de Precisão, Skill Editável, Minimização Automática e Autonomia Avançada de Navegação do Agente IA
+
+Nesta atualização, aprimoramos a precisão operacional do Agente de IA com melhorias de layout, skill editável e minimização automática da janela. Adicionalmente, adicionamos superpoderes de **Autonomia Avançada** para permitir que o agente navegue pelo computador de forma direta através de leitura/escrita de arquivos locais, execução de comandos no CMD/Terminal e abertura de URLs.
+
+---
+
+## Recursos e Melhorias Implementadas
+
+### 1. Autonomia Avançada de Navegação (Computador e Terminal)
+* **Novas Habilidades de Ação**: O interpretador de ações do agente agora suporta 4 novos tipos de comandos JSON:
+  * `read_file`: Lê os primeiros 2000 caracteres de um arquivo do computador e retorna o conteúdo no próximo feedback.
+  * `write_file`: Escreve um conteúdo especificado em um arquivo físico.
+  * `run_command`: Roda comandos no CMD (terminal Windows) com tratamento de erros e limite de tempo de 10 segundos (para evitar travamentos).
+  * `open_url`: Abre qualquer site web no navegador padrão do computador do usuário de forma instantânea.
+* **Lógica de Feedback do Agente**: Criamos uma lista `agent_action_feedback` para registrar o resultado de todas as operações e comandos executados. Ao iniciar a iteração seguinte, o resultado (ex: conteúdo lido do arquivo, saída stdout/stderr do CMD) é injetado no prompt para a análise do GPT-4o, garantindo total autonomia e precisão na execução da tarefa.
+
+### 2. Ajustes de Layout e Redimensionamento
+* **Janela Expandida**: Aumentamos o tamanho padrão da janela principal de `1100x660` para `1150x680` em `app.py`. Isso previne que componentes fiquem apertados em monitores com diferentes configurações de escala.
+* **Botão Selenium**: Aumentamos a largura do botão de abrir o navegador Selenium de `22` para `26` caracteres para exibir o texto completo *"Abrir Navegador Automatizado"*.
+
+### 3. Painel de Skill / Prompt de Sistema Editável (SQLite)
+* **Skill Base no Painel**: Adicionamos um painel editável `tk.Text` no painel central com o título **Prompt de Sistema / Skill Base do Agente**.
+* **Persistência no Banco**: O prompt editado é gravado na tabela `settings` sob a chave `agent_system_prompt`.
+
+### 4. Minimização Automática da Janela do App
+* **Checkbox de Controle**: Inserimos o checkbox **"Minimizar janela do app ao iniciar o agente"** (marcado por padrão como `True`) no topo do Painel de Chat à direita.
+* **Comportamento de Minimização/Restauração**:
+  * Ao disparar uma tarefa autônoma, a janela minimiza automaticamente chamando `self.root.iconify()`.
+  * O aplicativo restaura sua janela automaticamente (`self.root.deiconify()`, `self.root.lift()` e `self.root.focus_force()`) quando necessita de intervenção do usuário (`waiting_for_user: true`) ou quando a tarefa é totalmente concluída ou finalizada.
+
+---
+
+## Como Validar as Alterações de Autonomia Avançada
+
+### 1. Testar Leitura Direta de Arquivo (Sem interação manual)
+1. Certifique-se de que possui um arquivo em `C:\Users\willi\Documents\danilo\teste.csv` (ou crie um arquivo semelhante).
+2. No chat do aplicativo, digite:
+   * *"me responda qual email existe dentro desse arquivo: C:\Users\willi\Documents\danilo\teste.csv"*
+3. Clique em **Enviar**.
+4. A janela irá se minimizar. O agente executará o comando `read_file` por baixo dos panos, receberá o conteúdo na próxima iteração e restaurará a janela exibindo o e-mail correspondente (ex: `danilo@teste.com`) de forma totalmente autônoma, sem solicitar que você abra nada!
+
+### 2. Testar Execução de Comando de Terminal
+1. No chat do aplicativo, pergunte:
+   * *"qual é o diretório atual de trabalho rodando o comando dir ou pwd"*
+2. O agente utilizará `run_command`, capturará a saída stdout do CMD e responderá no chat com a estrutura de pastas do diretório de execução.
+
+### 3. Testar Abertura de Link Web
+1. No chat do aplicativo, peça:
+   * *"abra a página do google no meu navegador"*
+2. O agente executará a ação `open_url` e o seu navegador padrão será iniciado exibindo a página correspondente.

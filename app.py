@@ -383,7 +383,7 @@ class DatabaseManager:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                if new_name and clicks:
+                if new_name and clicks is not None:
                     clicks_json = json.dumps(clicks)
                     cursor.execute("""
                         UPDATE recordings 
@@ -396,7 +396,7 @@ class DatabaseManager:
                         SET name = ?, updated_at = CURRENT_TIMESTAMP
                         WHERE name = ?
                     """, (new_name, name))
-                elif clicks:
+                elif clicks is not None:
                     clicks_json = json.dumps(clicks)
                     cursor.execute("""
                         UPDATE recordings 
@@ -1880,6 +1880,118 @@ class ClickRecorderApp:
             else:
                 self.append_chat_message("Sistema", "Uma automação ou tarefa de agente já está rodando. Aguarde ou clique em Parar.")
 
+    def confirm_agent_action(self, title, message):
+        """Solicita confirmação no thread principal antes de ações sensíveis do agente."""
+        done = threading.Event()
+        result = {"approved": False}
+
+        def ask():
+            try:
+                self.root.deiconify()
+                self.root.lift()
+                self.root.focus_force()
+                result["approved"] = messagebox.askyesno(title, message)
+            finally:
+                done.set()
+
+        try:
+            self.root.after(0, ask)
+            done.wait()
+        except Exception:
+            return False
+        return result["approved"]
+
+    def execute_agent_system_action(self, act):
+        """Executa ações sensíveis do agente com validação e confirmação explícita."""
+        act_type = act.get("type")
+
+        if act_type == "read_file":
+            path = act.get("path")
+            if not path:
+                return "Erro ao ler arquivo: caminho não informado."
+            abs_path = os.path.abspath(path)
+            if not os.path.isfile(abs_path):
+                return f"Erro ao ler arquivo: arquivo não existe ou não é um arquivo regular: '{abs_path}'."
+            if not self.confirm_agent_action(
+                "Confirmar leitura de arquivo",
+                f"O agente quer ler este arquivo:\n\n{abs_path}\n\nPermitir a leitura dos primeiros 2000 caracteres?"
+            ):
+                return f"Ação negada pelo usuário: leitura do arquivo '{abs_path}'."
+            try:
+                with open(abs_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(2000)
+                return f"Sucesso ao ler arquivo '{abs_path}':\n{content}"
+            except Exception as err:
+                return f"Erro ao ler arquivo '{abs_path}': {str(err)}"
+
+        if act_type == "write_file":
+            path = act.get("path")
+            content = act.get("content", "")
+            if not path:
+                return "Erro ao escrever arquivo: caminho não informado."
+            if not isinstance(content, str):
+                return "Erro ao escrever arquivo: conteúdo inválido."
+            if len(content) > 1_000_000:
+                return "Erro ao escrever arquivo: conteúdo excede o limite de 1 MB."
+            abs_path = os.path.abspath(path)
+            parent = os.path.dirname(abs_path)
+            if not parent or not os.path.isdir(parent):
+                return f"Erro ao escrever arquivo: pasta de destino não existe: '{parent}'."
+            action_desc = "sobrescrever" if os.path.exists(abs_path) else "criar"
+            if not self.confirm_agent_action(
+                "Confirmar escrita de arquivo",
+                f"O agente quer {action_desc} este arquivo:\n\n{abs_path}\n\nPermitir a escrita?"
+            ):
+                return f"Ação negada pelo usuário: escrita do arquivo '{abs_path}'."
+            try:
+                with open(abs_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                return f"Sucesso ao escrever no arquivo '{abs_path}'."
+            except Exception as err:
+                return f"Erro ao escrever no arquivo '{abs_path}': {str(err)}"
+
+        if act_type == "run_command":
+            command = (act.get("command") or "").strip()
+            if not command:
+                return "Erro ao executar comando: comando não informado."
+            if len(command) > 500:
+                return "Erro ao executar comando: comando excede o limite de 500 caracteres."
+            if not self.confirm_agent_action(
+                "Confirmar comando",
+                f"O agente quer executar este comando no terminal:\n\n{command}\n\nPermitir a execução?"
+            ):
+                return f"Ação negada pelo usuário: execução do comando '{command}'."
+            import subprocess
+            try:
+                res = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=10, encoding='utf-8', errors='ignore')
+                return f"Comando '{command}' executado.\nCódigo de saída: {res.returncode}\nStdout:\n{res.stdout[:1500]}\nStderr:\n{res.stderr[:1500]}"
+            except subprocess.TimeoutExpired:
+                return f"Erro: O comando '{command}' excedeu o limite de tempo de 10 segundos."
+            except Exception as err:
+                return f"Erro ao executar comando '{command}': {str(err)}"
+
+        if act_type == "open_url":
+            url = (act.get("url") or "").strip()
+            if not url:
+                return "Erro ao abrir URL: URL não informada."
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                return f"Erro ao abrir URL: somente URLs http/https completas são permitidas: '{url}'."
+            if not self.confirm_agent_action(
+                "Confirmar abertura de URL",
+                f"O agente quer abrir esta URL no navegador padrão:\n\n{url}\n\nPermitir?"
+            ):
+                return f"Ação negada pelo usuário: abertura da URL '{url}'."
+            import webbrowser
+            try:
+                webbrowser.open(url)
+                return f"Sucesso ao abrir URL '{url}' no navegador padrão."
+            except Exception as err:
+                return f"Erro ao abrir URL '{url}': {str(err)}"
+
+        return f"Erro: ação de sistema desconhecida '{act_type}'."
+
     def run_autonomous_agent(self, task_description, ai_mode="ocr", file_path="", file_path_2="", file_path_3="", output_path=""):
         api_key = self.db.get_setting("openai_api_key", "").strip()
         if not api_key:
@@ -1911,6 +2023,7 @@ class ClickRecorderApp:
         mouse_ctrl = MouseController()
         key_ctrl = KeyController()
         executed_actions = []
+        agent_action_feedback = []
 
         # Lê o conteúdo do arquivo 1 se existir
         file_content_1 = ""
@@ -1976,7 +2089,7 @@ class ClickRecorderApp:
                     "max_tokens": 3000
                 }
                 
-                res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+                res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=60)
                 res.raise_for_status()
                 
                 res_data = res.json()
@@ -2065,6 +2178,14 @@ class ClickRecorderApp:
                 iteration += 1
                 self.agent_status_var.set(f"Status: Executando {ai_mode} ({iteration}/{max_iterations})...")
 
+                # Agrupa feedbacks das ações executadas na iteração anterior
+                feedback_str = "\n".join(agent_action_feedback)
+                agent_action_feedback = [] # Limpa para acumular na iteração atual
+                if feedback_str:
+                    feedback_block = f"=== RETORNO DAS AÇÕES DA ITERAÇÃO ANTERIOR ===\n{feedback_str}\n==============================================\n\n"
+                else:
+                    feedback_block = ""
+
                 # Configura requisições para a API OpenAI
                 headers = {
                     "Authorization": f"Bearer {api_key}",
@@ -2075,15 +2196,83 @@ class ClickRecorderApp:
                 chat_context_str = "\n".join([f"[{m['role']}]: {m['content']}" for m in recent_chat])
 
                 if ai_mode == "ocr":
-                    # Captura a tela física
+                    # Captura a tela virtual completa (suporte a múltiplos monitores e DPI)
                     try:
                         user32 = ctypes.windll.user32
-                        screen_w = user32.GetSystemMetrics(0)
-                        screen_h = user32.GetSystemMetrics(1)
+                        # CXVIRTUALSCREEN = 78, CYVIRTUALSCREEN = 79
+                        screen_w = user32.GetSystemMetrics(78)
+                        screen_h = user32.GetSystemMetrics(79)
+                        x_virtual = user32.GetSystemMetrics(76)
+                        y_virtual = user32.GetSystemMetrics(77)
+                        if screen_w == 0 or screen_h == 0:
+                            x_virtual, y_virtual = 0, 0
+                            screen_w = user32.GetSystemMetrics(0)
+                            screen_h = user32.GetSystemMetrics(1)
                     except Exception:
+                        x_virtual, y_virtual = 0, 0
                         screen_w, screen_h = 1920, 1080
 
-                    screenshot = ImageGrab.grab()
+                    # Enumera todos os monitores e guarda suas coordenadas físicas/lógicas
+                    class MONITORINFO(ctypes.Structure):
+                        _fields_ = [
+                            ("cbSize", ctypes.c_ulong),
+                            ("rcMonitor", ctypes.c_long * 4),
+                            ("rcWork", ctypes.c_long * 4),
+                            ("dwFlags", ctypes.c_ulong)
+                        ]
+                    monitors_rects = []
+                    def monitor_enum_proc(hMonitor, hdcMonitor, lprcMonitor, dwData):
+                        info = MONITORINFO()
+                        info.cbSize = ctypes.sizeof(MONITORINFO)
+                        if ctypes.windll.user32.GetMonitorInfoW(hMonitor, ctypes.byref(info)):
+                            monitors_rects.append(list(info.rcMonitor))
+                        return True
+                    
+                    MonitorEnumProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
+                    callback = MonitorEnumProc(monitor_enum_proc)
+                    ctypes.windll.user32.EnumDisplayMonitors(None, None, callback, 0)
+                    
+                    # Ordena monitores da esquerda para a direita
+                    monitors_rects.sort(key=lambda r: r[0])
+                    if not monitors_rects:
+                        monitors_rects.append([x_virtual, y_virtual, x_virtual + screen_w, y_virtual + screen_h])
+
+                    screenshot = ImageGrab.grab(all_screens=True)
+                    
+                    # Recorta sub-prints para cada monitor individualmente para evitar distorção de aspect ratio
+                    images_content = []
+                    monitors_description = []
+                    for idx, rect in enumerate(monitors_rects, start=1):
+                        left, top, right, bottom = rect
+                        # Translada coordenadas globais do Windows para o sistema de coordenadas do print do PIL
+                        c_left = left - x_virtual
+                        c_top = top - y_virtual
+                        c_right = right - x_virtual
+                        c_bottom = bottom - y_virtual
+                        
+                        # Limita aos limites reais da imagem capturada
+                        c_left = max(0, min(screenshot.width, c_left))
+                        c_top = max(0, min(screenshot.height, c_top))
+                        c_right = max(0, min(screenshot.width, c_right))
+                        c_bottom = max(0, min(screenshot.height, c_bottom))
+                        
+                        cropped = screenshot.crop((c_left, c_top, c_right, c_bottom))
+                        
+                        buffer = io.BytesIO()
+                        cropped.save(buffer, format="JPEG", quality=80)
+                        img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                        
+                        images_content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{img_base64}"
+                            }
+                        })
+                        
+                        monitors_description.append(
+                            f"- Imagem {idx} (Tela {idx}): Resolução {cropped.width}x{cropped.height}. Coordenadas na área de trabalho virtual: esquerda={left}, topo={top}, direita={right}, baixo={bottom}."
+                        )
+
                     img_w, img_h = screenshot.size
 
                     buffer = io.BytesIO()
@@ -2096,13 +2285,19 @@ class ClickRecorderApp:
                     else:
                         custom_skill_block = ""
 
+                    monitors_desc_str = "\n".join(monitors_description)
                     prompt = (
                         f"{custom_skill_block}"
+                        f"{feedback_block}"
                         f"Você é um robô de RPA inteligente executando em loop autônomo. O usuário quer que você execute a seguinte tarefa: '{task_description}'.\n"
                         f"Temos dados de um arquivo local que podem ser relevantes:\n"
                         f"=== DADOS DO ARQUIVO ===\n{file_content_1}\n========================\n\n"
-                        f"A resolução física do monitor atual é de {screen_w}x{screen_h} pixels.\n"
-                        f"A imagem enviada é um print da tela inteira do monitor. A resolução do print é {img_w}x{img_h}.\n"
+                        f"O computador do usuário possui {len(monitors_rects)} monitor(es) conectado(s):\n"
+                        f"{monitors_desc_str}\n\n"
+                        f"Enviamos {len(monitors_rects)} imagem(ns) correspondente(s) a cada tela física, na ordem correspondente.\n"
+                        f"IMPORTANTE: Você deve informar em qual monitor quer clicar usando o campo `\"monitor\"` (ex: 1 para Tela 1, 2 para Tela 2) e as coordenadas `\"x\"` e `\"y\"` RELATIVAS a essa tela específica (ou seja, variando de 0 a largura-1 e 0 a altura-1 daquela tela).\n"
+                        f"Nós calcularemos a translação para as coordenadas globais automaticamente no sistema.\n"
+                        f"Selecione sempre o CENTRO EXATO do elemento visual na imagem da tela correspondente para evitar clicar nas bordas e errar o clique.\n\n"
                         f"Aqui está o histórico recente do chat:\n"
                         f"=== HISTÓRICO DE CHAT ===\n{chat_context_str}\n========================\n\n"
                         f"Aqui está a lista de ações já executadas para evitar repetições:\n"
@@ -2115,13 +2310,21 @@ class ClickRecorderApp:
                         f"  \"waiting_for_user\": false, // defina como true se você precisar de alguma resposta ou ajuda do usuário no chat para prosseguir\n"
                         f"  \"actions\": [\n"
                         f"    // Uma ou mais ações a serem executadas sequencialmente nesta iteração. Exemplos:\n"
-                        f"    // {{\"type\": \"click\", \"x\": 150, \"y\": 300}},\n"
+                        f"    // {{\"type\": \"click\", \"monitor\": 1, \"x\": 150, \"y\": 300}}, // Clique na Tela 1\n"
+                        f"    // {{\"type\": \"click\", \"monitor\": 2, \"x\": 500, \"y\": 400}}, // Clique na Tela 2\n"
                         f"    // {{\"type\": \"type\", \"text\": \"valor a digitar\"}},\n"
                         f"    // {{\"type\": \"scroll\", \"dx\": 0, \"dy\": -100}},\n"
-                        f"    // {{\"type\": \"wait\", \"duration\": 2.0}}\n"
+                        f"    // {{\"type\": \"wait\", \"duration\": 2.0}},\n"
+                        f"    // {{\"type\": \"read_file\", \"path\": \"caminho_completo_do_arquivo\"}}, // Ação sensível: pede confirmação do usuário antes de ler\n"
+                        f"    // {{\"type\": \"write_file\", \"path\": \"caminho_completo_do_arquivo\", \"content\": \"conteúdo\"}}, // Ação sensível: pede confirmação do usuário antes de escrever\n"
+                        f"    // {{\"type\": \"run_command\", \"command\": \"comando_de_terminal\"}}, // Ação sensível: pede confirmação do usuário antes de executar\n"
+                        f"    // {{\"type\": \"open_url\", \"url\": \"https://exemplo.com\"}} // Ação sensível: pede confirmação do usuário antes de abrir\n"
                         f"  ]\n"
                         f"}}"
                     )
+
+                    content_list = [{"type": "text", "text": prompt}]
+                    content_list.extend(images_content)
 
                     payload = {
                         "model": "gpt-4o",
@@ -2129,15 +2332,7 @@ class ClickRecorderApp:
                         "messages": [
                             {
                                 "role": "user",
-                                "content": [
-                                    {"type": "text", "text": prompt},
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": f"data:image/jpeg;base64,{img_base64}"
-                                        }
-                                    }
-                                ]
+                                "content": content_list
                             }
                         ],
                         "max_tokens": 1000,
@@ -2169,6 +2364,7 @@ class ClickRecorderApp:
 
                     prompt = (
                         f"{custom_skill_block}"
+                        f"{feedback_block}"
                         f"Você é um assistente de automação web Selenium executando em loop autônomo. O usuário quer executar a tarefa: '{task_description}'.\n"
                         f"Temos dados de um arquivo local relevante:\n"
                         f"=== DADOS DO ARQUIVO ===\n{file_content_1}\n========================\n\n"
@@ -2187,7 +2383,11 @@ class ClickRecorderApp:
                         f"    // Exemplos:\n"
                         f"    // {{\"type\": \"click\", \"by\": \"id\", \"value\": \"id_do_elemento\"}},\n"
                         f"    // {{\"type\": \"type\", \"by\": \"id\", \"value\": \"id_do_elemento\", \"text\": \"valor\"}},\n"
-                        f"    // {{\"type\": \"wait\", \"duration\": 1.0}}\n"
+                        f"    // {{\"type\": \"wait\", \"duration\": 1.0}},\n"
+                        f"    // {{\"type\": \"read_file\", \"path\": \"caminho_completo_do_arquivo\"}}, // Ação sensível: pede confirmação do usuário antes de ler\n"
+                        f"    // {{\"type\": \"write_file\", \"path\": \"caminho_completo_do_arquivo\", \"content\": \"conteúdo\"}}, // Ação sensível: pede confirmação do usuário antes de escrever\n"
+                        f"    // {{\"type\": \"run_command\", \"command\": \"comando_de_terminal\"}}, // Ação sensível: pede confirmação do usuário antes de executar\n"
+                        f"    // {{\"type\": \"open_url\", \"url\": \"https://exemplo.com\"}} // Ação sensível: pede confirmação do usuário antes de abrir\n"
                         f"  ]\n"
                         f"}}"
                     )
@@ -2202,7 +2402,7 @@ class ClickRecorderApp:
                         "temperature": 0.2
                     }
 
-                res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+                res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=60)
                 res.raise_for_status()
                 res_data = res.json()
                 ai_message = res_data['choices'][0]['message']['content'].strip()
@@ -2253,16 +2453,50 @@ class ClickRecorderApp:
                         break
 
                     act_type = act.get("type")
+
+                    # Ações universais/de sistema exigem confirmação explícita do usuário.
+                    if act_type in {"read_file", "write_file", "run_command", "open_url"}:
+                        feedback_msg = self.execute_agent_system_action(act)
+                        agent_action_feedback.append(feedback_msg)
+                        executed_actions.append(f"{act_type}: {feedback_msg.splitlines()[0]}")
+                        continue
+
+                    # Ações específicas do modo de automação
                     if ai_mode == "ocr":
                         if act_type == "click":
-                            x, y = act.get("x"), act.get("y")
+                            try:
+                                # Obtém o monitor de destino (default 1)
+                                mon_idx = int(act.get("monitor", 1)) - 1
+                                if mon_idx < 0 or mon_idx >= len(monitors_rects):
+                                    mon_idx = 0
+                                
+                                rect = monitors_rects[mon_idx]
+                                left, top, right, bottom = rect
+                                mon_w = right - left
+                                mon_h = bottom - top
+                                
+                                # Coordenadas relativas
+                                rel_x = int(act.get("x", 0))
+                                rel_y = int(act.get("y", 0))
+                                
+                                # Limita aos limites físicos daquele monitor específico
+                                rel_x = max(0, min(mon_w - 1, rel_x))
+                                rel_y = max(0, min(mon_h - 1, rel_y))
+                                
+                                # Translada coordenadas relativas para as globais do desktop virtual
+                                x = left + rel_x
+                                y = top + rel_y
+                            except Exception:
+                                x, y = 0, 0
+                                mon_idx, rel_x, rel_y = 0, 0, 0
+                            
                             mouse_ctrl.position = (x, y)
                             time.sleep(0.2)
                             mouse_ctrl.press(MouseButton.left)
                             time.sleep(0.05)
                             mouse_ctrl.release(MouseButton.left)
                             time.sleep(0.5)
-                            executed_actions.append(f"Clique em ({x}, {y})")
+                            executed_actions.append(f"Clique em ({x}, {y}) (Tela {mon_idx + 1}: rel_x={rel_x}, rel_y={rel_y})")
 
                         elif act_type == "type":
                             text = act.get("text")

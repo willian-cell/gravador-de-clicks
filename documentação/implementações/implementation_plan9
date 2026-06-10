@@ -1,0 +1,52 @@
+# Plano de Implementação: Capacidade de Navegação do Computador pelo Agente de IA (Autonomia Avançada)
+
+Este plano descreve como adicionaremos novos superpoderes de autonomia ao Agente de IA. O agente passará a ser capaz de ler e escrever arquivos locais, rodar comandos do terminal/prompt (CMD) e abrir páginas web diretamente, fornecendo um fluxo totalmente independente para concluir as tarefas solicitadas no chat sem necessitar de auxílio manual do usuário para abrir documentos ou softwares.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Ações Diretas no Sistema**: O agente agora poderá executar comandos de terminal (`run_command`) e ler/escrever arquivos no computador do usuário. Isso é extremamente útil para a autonomia da IA (como ler planilhas, rodar scripts Python locais ou abrir programas específicos).
+>
+> **Lógica de Feedback de Ação**: O resultado destas operações (conteúdo lido de arquivos, saída stdout/stderr de comandos) será capturado e retroalimentado dinamicamente para o agente na próxima iteração do loop, permitindo que ele tome decisões informadas.
+
+## Proposed Changes
+
+### [Componentes do Loop do Agente](file:///c:/Users/willi/Documents/danilo/app.py)
+
+#### [MODIFY] [app.py](file:///c:/Users/willi/Documents/danilo/app.py)
+
+- **Novas Opções de Ação no Prompt do Sistema**:
+  - Atualizar os exemplos de JSON aceitos no prompt de `ocr` e `selenium` para incluir:
+    * `{"type": "read_file", "path": "caminho_completo"}`: lê o conteúdo de um arquivo (limitado aos primeiros 2000 caracteres).
+    * `{"type": "write_file", "path": "caminho_completo", "content": "conteúdo"}`: grava ou sobrescreve informações em um arquivo local.
+    * `{"type": "run_command", "command": "comando"}`: roda um comando no terminal Windows (CMD) de forma síncrona (timeout de 10 segundos).
+    * `{"type": "open_url", "url": "https://..."}`: abre uma URL diretamente no navegador padrão.
+
+- **Captura e Retroalimentação de Execução (`feedback_block`)**:
+  - Criar uma lista `agent_action_feedback = []` no início de `run_autonomous_agent`.
+  - No início de cada iteração, agrupar todos os feedbacks anteriores em um bloco estruturado `=== RETORNO DAS AÇÕES DA ITERAÇÃO ANTERIOR ===` e injetar este texto logo abaixo do prompt de diretrizes do sistema.
+  - Limpar a lista para acumular os resultados da iteração corrente.
+
+- **Interpretador de Novas Ações**:
+  - No interpretador de ações físicas da IA (dentro de `run_autonomous_agent`), implementar os blocos correspondentes para as novas ações (`read_file`, `write_file`, `run_command`, `open_url`):
+    * Usar `subprocess.run` com tratamento de timeout e codificação para garantir execução sem travamentos e capturar saídas corretas de stdout/stderr.
+    * Usar `webbrowser.open` para abrir links web externos.
+    * Realizar tratamento de erros robusto em cada operação para que falhas de caminhos de arquivos ou sintaxe de comandos sejam reportadas de volta para a IA analisar no próximo passo em vez de quebrar a execução.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Compilar o arquivo com `python -m py_compile app.py` para garantir que a sintaxe Python e as importações adicionais estejam corretas.
+
+### Manual Verification
+1. **Leitura de Arquivo via Chat**:
+   - Iniciar o app e solicitar no chat: `"me responda qual email existe dentro desse arquivo: C:\Users\willi\Documents\danilo\teste.csv"`
+   - Verificar se o agente utiliza a ação `read_file`, recebe o conteúdo estruturado e responde com o e-mail correto (`danilo@teste.com` ou `willian@teste.com`) de forma totalmente autônoma.
+2. **Execução de Comando**:
+   - Solicitar no chat: `"qual é o diretório atual de trabalho rodando o comando pwd ou dir"`
+   - Verificar se o agente executa a ação `run_command`, lê a saída do terminal e exibe no chat.
+3. **Abertura de Link**:
+   - Solicitar no chat: `"abra o site do Google no navegador"`
+   - Validar se o navegador padrão do sistema operacional é acionado com o link correto.

@@ -1,0 +1,47 @@
+# Walkthrough: Melhorias de Precisão, Skill Editável, Minimização Automática, Autonomia Avançada e Calibração de Cliques (DPI & Múltiplos Monitores)
+
+Nesta atualização, aprimoramos o sistema para oferecer **calibração cirúrgica de cliques**, compatibilidade total com **múltiplos monitores** e **correções automáticas de escala de DPI**.
+
+---
+
+## Recursos e Melhorias Implementadas
+
+### 1. Calibração de Cliques e DPI (Surgical Precision)
+* **Captura de Tela Virtual (`all_screens=True`)**: Modificamos a captura de tela física para obter a área de trabalho virtual completa (`ImageGrab.grab(all_screens=True)`). Se o usuário possuir múltiplos displays acoplados, o agente agora consegue ver e interagir em todos eles simultaneamente.
+* **Alinhamento de Escala de DPI**: Calculamos e medimos a resolução virtual do desktop (`CXVIRTUALSCREEN`/`CYVIRTUALSCREEN`). Caso a imagem capturada fisicamente tenha um tamanho de pixel diferente das coordenadas lógicas de movimentação de mouse do Windows, a imagem é cirurgicamente redimensionada no backend via `LANCZOS`. Isso elimina qualquer desvio físico e garante que as coordenadas do robô combinem exatamente com a mira do clique.
+* **Instrução de Mira Central**: Adicionamos diretrizes cirúrgicas no prompt de visão do agente, instruindo a IA a calcular o pixel exato correspondente ao **centro geométrico** dos botões e campos de texto, evitando cliques em bordas ou cantos que possam falhar.
+* **Saturação e Segurança de Coordenadas**: Implementamos um limitador (`clamp`) que assegura que as coordenadas `(x, y)` retornadas fiquem sempre contidas entre `0` e a largura/altura máximas da tela virtual do sistema operacional, evitando erros no controlador de mouse.
+
+### 2. Autonomia Avançada de Navegação (Computador e Terminal)
+* **Novas Habilidades de Ação**: O interpretador de ações do agente suporta:
+  * `read_file`: Lê os primeiros 2000 caracteres de um arquivo do computador e retorna o conteúdo no próximo feedback.
+  * `write_file`: Escreve um conteúdo especificado em um arquivo físico.
+  * `run_command`: Roda comandos no CMD (terminal Windows) com limite de tempo máximo (timeout de 10 segundos).
+  * `open_url`: Abre qualquer site web no navegador padrão do computador do usuário de forma instantânea.
+* **Lógica de Feedback do Agente**: Grava o resultado de todas as operações e comandos executados e os envia como contexto na iteração seguinte.
+
+### 3. Ajustes de Layout e Redimensionamento
+* **Janela Expandida**: Aumentamos o tamanho padrão da janela principal para `1150x680`.
+* **Botão Selenium**: Aumentamos a largura do botão de abrir o navegador Selenium de `22` para `26` caracteres.
+
+### 4. Painel de Skill / Prompt de Sistema Editável (SQLite)
+* **Skill Base no Painel**: Adicionamos um painel editável `tk.Text` no painel central com o título **Prompt de Sistema / Skill Base do Agente**.
+* **Persistência no Banco**: O prompt editado é gravado na tabela `settings` sob a chave `agent_system_prompt`.
+
+### 5. Minimização Automática da Janela do App
+* **Checkbox de Controle**: Inserimos o checkbox **"Minimizar janela do app ao iniciar o agente"** (marcado por padrão como `True`) no topo do Painel de Chat à direita.
+
+---
+
+## Como Validar as Alterações de Calibração
+
+### 1. Testar em Múltiplos Monitores
+1. Se tiver mais de um monitor conectado, arraste um aplicativo (ex: Bloco de Notas) para o monitor secundário.
+2. No chat do aplicativo, envie um comando como:
+   * *"clique no meio do bloco de notas e digite sucesso"*
+3. A janela principal do app irá se minimizar. O agente capturará a imagem inteira (cobrindo ambos os monitores) e localizará o bloco de notas no segundo monitor, realizando o clique com precisão milimétrica.
+
+### 2. Testar Mira no Centro do Elemento
+1. Dê um comando para clicar em um botão pequeno ou elemento específico de algum site ou aplicativo aberto na tela.
+2. Acompanhe visualmente o ponteiro do mouse se mover e clique no local.
+3. O ponteiro deve parar exatamente sobre o meio do elemento e não nas bordas.

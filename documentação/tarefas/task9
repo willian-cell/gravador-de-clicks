@@ -1,0 +1,9 @@
+# Lista de Tarefas: Navegação e Autonomia Avançada do Agente de IA
+
+- `[x]` Inicializar lista de feedbacks `agent_action_feedback = []` em `run_autonomous_agent`
+- `[x]` Extrair e formatar `feedback_block` a cada iteração do loop do agente
+- `[x]` Expandir definições de ações (read_file, write_file, run_command, open_url) nos prompts de OCR e Selenium
+- `[x]` Implementar os blocos de execução correspondentes para as 4 novas ações no loop do agente
+- `[x]` Adicionar tratamentos de erro e limites de tempo (timeout de 10s) na execução de comandos de terminal
+- `[x]` Compilar e validar a sintaxe do arquivo `app.py`
+- `[x]` Atualizar o `walkthrough.md` com os testes recomendados de autonomia avançada (Pronto para validação do usuário)
